@@ -10,12 +10,13 @@ import cPickle as pickle
 from numpy import sum as nsum
 from numpy import newaxis
 from numpy import zeros
+from numpy import ones
 from numpy import exp
 from numpy import einsum
 from numpy.random import choice
+from numpy.random import dirichlet
 from numpy.random import multivariate_normal as mvnrand
 
-from model_util import ModelUtil
 from model_util import CheckTools
 
 cdir = os.path.abspath(os.path.dirname(__file__))
@@ -385,10 +386,8 @@ class qS(object):
         qs = qS(n_states, expt_init_mode='kmeans')
         @argv
         n_states: number of states
-        expt_init_mode: initialisation mode, 'random' or 'kmeans'
         '''
         self.n_states = n_states
-        self.expt_init_mode = argvs.get('expt_init_mode', 'random')
         self.expt = None
         self.const = 0
         self._eps = 1e-10
@@ -399,14 +398,12 @@ class qS(object):
         qS.init_expt(data_len, argvs)
         @argvs
         data_len: int
-        **argvs:
-            Y: (data_dim, data_len)
-            S: (data_len)
-            qpi: qPi object
-        expt: (n_states, data_lem)
+        argvs:
+            pi: np.array(n_states), probabilities, sum must be 1
+        self.expt: (n_states, data_lem)
         '''
-        expt = ModelUtil.init_expt_s(data_len, self.n_states,
-                                     self.expt_init_mode, **argvs)
+        alpha_pi = argvs.get('alpha_pi', ones(self.n_states))
+        expt = dirichlet(alpha_pi, size=data_len).T
         self.set_expt(expt)
 
     def set_expt(self, expt):
@@ -461,27 +458,6 @@ class qS(object):
                 S[t] = k
         return S
 
-    def get_estims(self, Y, theta, force_update=True):
-        '''
-        qS.get_estims(Y, theta, force_update=True)
-        @argvs
-        Y: observation data, np.array(data_dim, data_len)
-        theta: class object, Theta()
-        force_update: return hidden vriables from cotained expt_s
-                      whether the model was updated or not
-        @return
-        S: estimated hidden variables, np.array(data_len)
-        '''
-        if not self.updated or force_update:
-            if Y is None:
-                logger.warn('qS was not updated. return initial expt_s')
-            else:
-                data_len = Y.shape[-1]
-                self.init_expt(data_len, Y=Y)
-                self.update(Y, theta)
-        S = self.expt.argmax(0)
-        return S
-
 
 class Gmm(CheckTools):
     '''
@@ -503,11 +479,9 @@ class Gmm(CheckTools):
         '''
         self.data_dim = data_dim
         self.n_states = n_states
-        self.expt_init_mode = argvs.get('expt_init_mode', 'random')
-        # self.expt_init_mode = argvs.get('expt_init_mode', 'kmeans')
         # --- classes
         self.theta = Theta(data_dim, n_states)
-        self.qs = qS(n_states, expt_init_mode=self.expt_init_mode)
+        self.qs = qS(n_states)
         # --- learning params
         self.update_order = argvs.get('update_order', ['E', 'M'])
         self.max_em_itr = argvs.get('max_em_itr', 5)
@@ -606,36 +580,6 @@ class Gmm(CheckTools):
             Y[:, t] = mvnrand(mu[:, k], cov)
         return Y, S, [mu, R, pi]
 
-    def get_estims(self, Y=None, use_sample=False):
-        '''
-        gmm.get_estims(Y=None, use_sample=False)
-        @argv
-        Y: np.array(data_dim, data_len)
-        use_sample: flag to use sampled estimation values or not, default False
-        @return
-        estim_y: (data_dim, data_len), waveform sequence
-        estim_s: (data_len), state sequence which contains 0 to n_states - 1
-        vb: float value, valiational bound
-        '''
-        estim_s = self.qs.get_estims(Y, self.theta, True)
-        estim_y = zeros((self.data_dim, len(estim_s)))
-        if use_sample:
-            for k in xrange(self.n_states):
-                idx = estim_s == k
-                data_len = estim_y[:, idx].shape[-1]
-                mu, R = self.theta.qmur.post.sample()
-                estim_y[:, idx] = mvnrand(
-                    mu[:, k], inv(R[:, :, k]), size=data_len).T
-        else:
-            for k in xrange(self.n_states):
-                idx = estim_s == k
-                data_len = estim_y[:, idx].shape[-1]
-                m = self.theta.qmur.post.mu[:, k]
-                c = inv(self.theta.qmur.post.expt_prec[:, :, k])
-                estim_y[:, idx] = mvnrand(m, c, size=data_len).T
-        vb = self.calc_vb()
-        return estim_y, estim_s, vb
-
     def save_params(self, file_name):
         was_saved = self.theta.save_param_dict(file_name)
         logger.info('saved %s' % file_name)
@@ -657,7 +601,6 @@ def gen_data(data_dim, n_states, data_len):
 
 
 def run_gmm(Y, S, n_states):
-    from eval_disaggregation import EvalDisagg
     print '%d states GMM' % n_states
     data_dim, data_len = Y.shape
     gmm = Gmm(data_dim, n_states, expt_init_mode='random')
