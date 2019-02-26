@@ -262,49 +262,6 @@ class Theta():
         self.qmur.set_default_params()
         self.qpi.set_default_params()
 
-    def clear_params(self):
-        '''
-        theta.clear_params()
-        '''
-        self.qmur.clear_params()
-        self.qpi.clear_params()
-
-    def update(self, Y, expt_S, YY=None):
-        '''
-        theta.update(Y, expt_S, YY=None)
-        @argv
-        Y: data, np.array(data_dim, data_len)
-        expt_S: <S>, np.array(n_states, data_len)
-        YY: YY^T, np.array(data_dim, data_dim, data_len)
-        '''
-        for ut in self.update_order:
-            if ut == 'mu_R':
-                self.qmur.update(Y, expt_S, YY=YY)
-            elif ut == 'pi':
-                self.qpi.update(expt_S)
-            else:
-                logger.error('%s is not supported' % ut)
-
-    def get_params(self, by_posterior=True):
-        '''
-        theta.get_params(by_posterior)
-        @argvs
-        by_posterior: parameters of posterior(True) or prior(False)
-        @return
-        dst: dictionary
-            {'MuR':
-             {'mu', 'beta', 'nu', 'W', 'inv_W',
-              'expt_prec', 'expt_ln_det_prec',
-              'expt_prec_mu', 'expt_mu_prec_mu'},
-             'Pi': {'alpha', 'ln_alpha'}
-            }
-        '''
-        dst = {
-            'MuR': self.qmur.get_param_dict(by_posterior),
-            'Pi': self.qpi.get_param_dict(by_posterior),
-        }
-        return dst
-
     def set_params(self, prm):
         '''
         theta.set_params(prm)
@@ -333,13 +290,56 @@ class Theta():
                 self.qpi.set_default_params()
         self.n_states = self.qmur.n_states
 
-    def save_param_dict(self, file_name):
+    def clear_params(self):
+        '''
+        theta.clear_params()
+        '''
+        self.qmur.clear_params()
+        self.qpi.clear_params()
+
+    def update(self, Y, expt_S, YY=None):
+        '''
+        theta.update(Y, expt_S, YY=None)
+        @argv
+        Y: data, np.array(data_dim, data_len)
+        expt_S: <S>, np.array(n_states, data_len)
+        YY: YY^T, np.array(data_dim, data_dim, data_len)
+        '''
+        for ut in self.update_order:
+            if ut == 'mu_R':
+                self.qmur.update(Y, expt_S, YY=YY)
+            elif ut == 'pi':
+                self.qpi.update(expt_S)
+            else:
+                logger.error('%s is not supported' % ut)
+
+    def get_param_dict(self, by_posterior=True):
+        '''
+        theta.get_param_dict(by_posterior)
+        @argvs
+        by_posterior: parameters of posterior(True) or prior(False)
+        @return
+        dst: dictionary
+            {'MuR':
+             {'mu', 'beta', 'nu', 'W', 'inv_W',
+              'expt_prec', 'expt_ln_det_prec',
+              'expt_prec_mu', 'expt_mu_prec_mu'},
+             'Pi': {'alpha', 'ln_alpha'}
+            }
+        '''
+        dst = {
+            'MuR': self.qmur.get_param_dict(by_posterior),
+            'Pi': self.qpi.get_param_dict(by_posterior),
+        }
+        return dst
+
+    def save_param_dict(self, file_name, by_posterior=True):
         '''
         theta.save_param_dict(file_name)
         @argvs
         file_name: string
         '''
-        prm = self.get_post_params()
+        prm = self.get_param_dict(by_posterior)
         with open(file_name, 'w') as f:
             pickle.dump(prm, f)
 
@@ -435,27 +435,21 @@ class qS(object):
         self.const = norm.sum()
         self.updated = True
 
-    def get_samples(self, data_len, pi, return_uniform_s=False):
+    def get_samples(self, data_len, pi=None):
         '''
-        qS.get_samples(data_len, pi, return_uniform_s=False)
+        qS.get_samples(data_len, pi)
         @argv
         data_len: sample data length, int
-        pi: chass object, qPi()
-        return_uniform_s: flag to return uniformly assigned S, default False
+        pi: np.array(n_states), probability array
         @return
         S: sampled data, np.array(data_len)
         '''
         S = zeros(data_len, dtype=int)
-        if return_uniform_s:
-            state_len = int(data_len / float(self.n_states))
-            t = state_len + data_len % self.n_states
-            for k in xrange(1, self.n_states):
-                S[t:(t + state_len)] = k
-                t += state_len
-        else:
-            for t in xrange(data_len):
-                k = choice(self.n_states, p=pi)
-                S[t] = k
+        if pi is None:
+            pi = ones(self.n_states, dtype=float) / self.n_states
+        for t in xrange(data_len):
+            k = choice(self.n_states, p=pi)
+            S[t] = k
         return S
 
 
