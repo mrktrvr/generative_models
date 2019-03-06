@@ -1,10 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 '''
-Copyright 2017, Informetis Europe Ltd. Z-lab
-
 default_hyper_params.py
-@author: mark
 '''
 import os
 import sys
@@ -81,21 +78,18 @@ class ParamNormalWishart(object):
     def _gen_beta(self):
         self.beta = ones(self.n_states) * 1e+0
 
-    def _gen_W(self, use_eye=False):
-        c = 1e-1
-        e = eye(self.data_dim) * c
-        if use_eye:
-            self.W = tile(e, (self.n_states, 1, 1)) * c
-        else:
-            from scipy.stats import wishart
-            self.W = wishart.rvs(self.data_dim, e, size=self.n_states)
+    def _gen_W(self, c=1e-1):
+        from scipy.stats import wishart
+        mat = eye(self.data_dim) * c
+        # mat = ones(self.data_dim) * c
+        self.W = wishart.rvs(self.data_dim, mat, size=self.n_states)
         self.W = self.W.transpose(1, 2, 0)
 
     def _gen_nu(self):
         self.nu = ones((self.n_states)) * self.data_dim * 1e+1
 
 
-class ParamDirichlet():
+class ParamDirichlet(object):
     def __init__(self, n_states, len_2d=-1):
         self.n_states = n_states
         self.len_2d = len_2d
@@ -107,6 +101,19 @@ class ParamDirichlet():
             self.alpha = ones(self.n_states) * c
         else:
             self.alpha = ones((self.n_states, self.len_2d)) * c
+
+
+class ParamGamma(object):
+    def __init__(self, data_dim, n_states):
+        self.data_dim = data_dim
+        self.n_states = n_states
+        self.a = None
+        self.b = None
+
+    def _gen_gam(self, c=1e+0):
+        a = ones((self.data_dim, self.n_states)) * c
+        b = ones((self.data_dim, self.n_states)) * c
+        return a, b
 
 
 def main_multivariate_normal():

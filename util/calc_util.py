@@ -7,16 +7,16 @@ import os
 
 from scipy.misc import logsumexp as scipy_lse
 from numpy import array as arr
-from numpy import atleast_3d
 from numpy import log
 from numpy import exp
-from numpy import diag
+from numpy import einsum
 from numpy.linalg import inv as np_inv
 from numpy.linalg import slogdet
 from numpy.linalg import cholesky
 from numpy.linalg import solve
 
 cdir = os.path.abspath(os.path.dirname(__file__))
+from util.logger import logger
 
 
 def inv(src):
@@ -31,13 +31,18 @@ def inv(src):
 def logdet(src, use_cholesky=True):
     '''
     src = logdet(src)
-    src: array(n, d, d)
+    src: array(d, d) or array(n, d, d) or array(l, n, d, d)
     dst: float or array(n)
     '''
     if use_cholesky:
-        if src.ndim != 3:
-            src = atleast_3d(src).transpose(2, 0, 1)
-        dst = arr([2 * log(diag(x)).sum() for x in cholesky(src)])
+        if src.ndim == 2:
+            dst = 2 * log(einsum('dd->d', cholesky(src))).sum()
+        if src.ndim == 3:
+            dst = 2 * log(einsum('ldd->ld', cholesky(src))).sum(1)
+        elif src.ndim == 4:
+            dst = 2 * log(einsum('lkdd->lkd', cholesky(src))).sum(2)
+        else:
+            logger.error('dim %d is not supprted.' % src.ndim)
     else:
         ldt, sgn = slogdet(src)
         dst = sgn * ldt
@@ -65,7 +70,7 @@ def calc_prec_mu(cov, mu):
 
 
 def main_inv_det():
-    from scipy.stats import wishartx
+    from scipy.stats import wishart
     from numpy import eye
     data_dim = 4
     n_states = 3

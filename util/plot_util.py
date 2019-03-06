@@ -1,5 +1,7 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 '''
-@author: mark
+plot_util.py
 '''
 
 from itertools import cycle
@@ -66,20 +68,22 @@ class Markers():
     def unfilled(self):
         '''
         '''
-        dst = cycle([
-            m for m, f in Line2D.markers.iteritems()
-            if f != 'nothing' and not isinstance(m, int)
-            and m not in self.ignore_markers and m not in Line2D.filled_markers
-        ])
+        dst = cycle(
+            [
+                m for m, f in Line2D.markers.iteritems()
+                if f != 'nothing' and not isinstance(m, int) and m not in self.
+                ignore_markers and m not in Line2D.filled_markers
+            ])
         return dst
 
     def all(self):
         '''
         '''
-        dst = cycle([
-            m for m, f in Line2D.markers.iteritems()
-            if m not in self.ignore_markers
-        ])
+        dst = cycle(
+            [
+                m for m, f in Line2D.markers.iteritems()
+                if m not in self.ignore_markers
+            ])
         return dst
 
     def get_filled_marker_list(self, n_mks):
