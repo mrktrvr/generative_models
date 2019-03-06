@@ -28,13 +28,13 @@ def inv(src):
     return dst
 
 
-def logdet(src, use_cholesky=True):
+def logdet(src):
     '''
     src = logdet(src)
     src: array(d, d) or array(n, d, d) or array(l, n, d, d)
     dst: float or array(n)
     '''
-    if use_cholesky:
+    try:
         if src.ndim == 2:
             dst = 2 * log(einsum('dd->d', cholesky(src))).sum()
         if src.ndim == 3:
@@ -43,7 +43,8 @@ def logdet(src, use_cholesky=True):
             dst = 2 * log(einsum('lkdd->lkd', cholesky(src))).sum(2)
         else:
             logger.error('dim %d is not supprted.' % src.ndim)
-    else:
+    except Exception as e:
+        # logger.warn(e)
         ldt, sgn = slogdet(src)
         dst = sgn * ldt
     return dst

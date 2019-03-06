@@ -622,16 +622,19 @@ class Gmm(CheckTools):
 
 def plotter(y, s, gmm, figno=1):
     daat_dim, data_len = y.shape
-    # --- sample
     _, _, prm = gmm.get_samples(data_len)
     vbs = gmm.vbs
-    _plotter_core(y, s, prm, vbs, 'sample', 100 * figno + 1)
-    prm = [
-        gmm.theta.qmur.post.mu,
-        gmm.theta.qmur.post.expt_prec,
-        gmm.theta.qpi.post.expt,
-    ]
-    _plotter_core(y, s, prm, vbs, 'expextation', 100 * figno + 2)
+    # --- sample
+    if False:
+        _plotter_core(y, s, prm, vbs, 'sample', 100 * figno + 1)
+    # --- expectation
+    if True:
+        prm = [
+            gmm.theta.qmur.post.mu,
+            gmm.theta.qmur.post.expt_prec,
+            gmm.theta.qpi.post.expt,
+        ]
+        _plotter_core(y, s, prm, vbs, 'expextation', 100 * figno + 2)
 
 
 def _plotter_core(y, s, prms, vbs, prm_type_str, figno):
