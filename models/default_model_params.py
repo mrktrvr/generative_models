@@ -67,3 +67,19 @@ class DefaultFaParams(object):
         z_cov[-1, -1] = eps
         z_prc = inv(z_cov)
         return z_mean, z_cov, z_prc
+
+
+class DefaultLdaParams(object):
+    @classmethod
+    def Pi(cls, n_states, n_cat):
+        '''
+        DefaultPriors().A(n_states, len_2d)
+        alpha_pi: (n_states, n_cat)
+        '''
+        alpha_pi = ones((n_states, n_cat)) * 10
+        return alpha_pi
+
+    @classmethod
+    def Phi(clf, n_cat):
+        alpha_phi = ones(n_cat)
+        return alpha_phi
