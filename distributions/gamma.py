@@ -24,9 +24,9 @@ from util.calc_util import logsumexp
 from util.logger import logger
 
 
-class GammaDistribution:
+class Gamma:
     '''
-    gd = GammaDistribution(n_states)
+    gd = Gamma(n_states)
     '''
 
     def __init__(self, n_states, data_dim=1, do_set_prm=False):
@@ -182,6 +182,6 @@ if __name__ == '__main__':
     n_states = 3
     a = ones((data_dim, n_states)) * 1e+3
     b = ones((data_dim, n_states))
-    gd = GammaDistribution(a=a, b=b)
+    gd = Gamma(a=a, b=b)
     print gd
     embed(header=__file__)

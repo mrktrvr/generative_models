@@ -27,7 +27,7 @@ sys.path.append(lib_root)
 from util.logger import logger
 from util.calc_util import inv
 from distributions.multivariate_normal import MultivariateNormal
-from distributions.gamma import GammaDistribution
+from distributions.gamma import Gamma
 from models.default_model_params import DefaultFaParams
 
 
@@ -222,7 +222,7 @@ class qR(object):
         self.set_params(a=a, b=b)
 
     def set_params(self, **argvs):
-        self.prior = GammaDistribution(self.n_states)
+        self.prior = Gamma(self.n_states)
         self.prior.set_params(**argvs)
         self.post = copy.deepcopy(self.prior)
         self.data_dim = self.prior.a.shape[0]
