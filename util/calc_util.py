@@ -3,20 +3,12 @@
 '''
 calc_util.py
 '''
-import os
-
-from scipy.misc import logsumexp as scipy_lse
 from numpy import array as arr
 from numpy import log
 from numpy import exp
 from numpy import einsum
-from numpy.linalg import inv as np_inv
-from numpy.linalg import slogdet
-from numpy.linalg import cholesky
-from numpy.linalg import solve
 
-cdir = os.path.abspath(os.path.dirname(__file__))
-from util.logger import logger
+from logger import logger
 
 
 def inv(src):
@@ -24,6 +16,7 @@ def inv(src):
     src: array(d, d) or array(n, d, d)
     dst: array(d, d) or array(n, d, d)
     '''
+    from numpy.linalg import inv as np_inv
     dst = np_inv(src)
     return dst
 
@@ -35,6 +28,7 @@ def logdet(src):
     dst: float or array(n)
     '''
     try:
+        from numpy.linalg import cholesky
         if src.ndim == 2:
             dst = 2 * log(einsum('dd->d', cholesky(src))).sum()
         if src.ndim == 3:
@@ -44,6 +38,7 @@ def logdet(src):
         else:
             logger.error('dim %d is not supprted.' % src.ndim)
     except Exception as e:
+        from numpy.linalg import slogdet
         # logger.warn(e)
         ldt, sgn = slogdet(src)
         dst = sgn * ldt
@@ -57,6 +52,7 @@ def logsumexp(src, axis=None):
     src: np.array(data_len, [data_dim])
     dst: np.array()
     '''
+    from scipy.misc import logsumexp as scipy_lse
     dst = scipy_lse(src, axis)
     return dst
 
@@ -66,8 +62,31 @@ def calc_prec_mu(cov, mu):
     prec: np.array(data_dim, data_dim, n)
     mu: np.array(data_dim, n)x)
     '''
+    from numpy.linalg import solve
     dst = arr([solve(cov[:, :, k], mu[:, k]) for k in xrange(mu.shape[-1])]).T
     return dst
+
+
+def logmatprod(ln_a, ln_b):
+    '''
+    ln_[i, j] = log(sum(exp(ln a[i, ...] + ln b[:, j])))
+    parameters
+    ln_a: np.array(size_A, ...)
+    ln_b: np.array(size_A, size_B)
+
+    returns
+    ln_C: np.array(size_A, size_B)
+    '''
+    from numpy import zeros
+    ln_a = arr([ln_a]) if ln_a.ndim == 1 else ln_a
+    ln_b = arr([ln_b]) if ln_b.ndim == 1 else ln_b
+    I = ln_a.shape[0]
+    J = ln_b.shape[1]
+    ln_C = zeros((I, J))
+    for i in xrange(I):
+        for j in xrange(J):
+            ln_C[i, j] = logsumexp(ln_a[i] + ln_b[:, j], -1)
+    return ln_C
 
 
 def main_inv_det():

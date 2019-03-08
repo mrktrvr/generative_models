@@ -20,13 +20,13 @@ from numpy.random import dirichlet
 from gmm import Theta as GmmTheta
 from gmm import qPi as GmmPi
 from gmm import qS as GmmS
-from forward_backward import fb_alg
+from forward_backward import ForwardBackward
 from model_util import CheckTools
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
 from distributions.dirichlet import Dirichlet
-from distribution.kl_divergence import KL_Dir
+from distributions.kl_divergence import KL_Dir
 from util.calc_util import inv
 from util.logger import logger
 
@@ -287,10 +287,10 @@ class qS(GmmS):
         YY: YY^T, np.array(data_dim, data_dim, data_len)
         '''
         logger.debug('calc ln_lkh')
-        ln_lkh_gmm = theta.qmur.calc_ln_lkh(Y, YY)
+        ln_obs_lkh = theta.qmur.calc_ln_lkh(Y, YY)
         logger.debug('forward backward')
-        lns, lnss, c = fb_alg(
-            ln_lkh_gmm.T, theta.qpi.post.expt_ln, theta.qA.post.expt_ln)
+        lns, lnss, c = ForwardBackward()(
+            ln_obs_lkh, theta.qpi.post.expt_ln, theta.qA.post.expt_ln)
         logger.debug('expt')
         s = exp(lns)
         ss = exp(lnss)
@@ -534,7 +534,7 @@ def plotter(y, s, hmm, figno=1):
 
 
 def _plotter_core(y, s, prm, vbs, prm_type_str, figno):
-    from plot_models import PlotModels
+    from util.plot_models import PlotModels
     mu, r, pi, A = prm
     n_cols = 3
     pm = PlotModels(3, n_cols, figno)

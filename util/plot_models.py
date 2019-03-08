@@ -305,7 +305,13 @@ class PlotModels():
         baseline = args.get('baseline', 'sym')
         lbls = args.get('lbls', ['%d' % x for x in range(src.shape[-1])])
         self.ax = self.get_ax(pos, rspan=rspan, cspan=cspan)
-        self.ax.plot(src)
+        n_states = src.shape[-1]
+        if n_states < 100:
+            clr = StateColor(n_states).get_color_list()
+            for k in xrange(n_states):
+                self.ax.plot(src[:, k], color=clr[k])
+        else:
+            self.ax.plot(src)
         # self.ax.legend(lbls, loc=0)
         xlim = (-1, src.shape[0])
         ymax = nanmax(abs(src))
