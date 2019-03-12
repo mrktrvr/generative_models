@@ -286,6 +286,19 @@ class NormalWishart(object):
         return dst
 
 
+def plotter(nw, figno=1):
+    from util.plot_models import PlotModels
+    from numpy import atleast_2d
+    n_cols = 4
+    n_rows = 1
+    pm = PlotModels(n_rows, n_cols, figno)
+    pm.plot_2d_array((0, 0), nw.mu, title=r'param $\mu$')
+    pm.multi_bar((0, 1), atleast_2d(nw.beta), title=r'param $\beta$')
+    pm.multi_bar((0, 2), atleast_2d(nw.nu), title=r'param $\nu$')
+    pm.tight_layout()
+    pm.show()
+
+
 def main():
     data_dim = 4
     n_states = 3
@@ -297,6 +310,7 @@ def main():
     print nw.expt_prec.shape
     print nw.expt_prec_mu.shape
     print nw.expt_mu_prec_mu.shape
+    plotter(nw, 1)
 
 
 if __name__ == '__main__':

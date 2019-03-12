@@ -152,6 +152,18 @@ class qMuR():
             mu, R = self.prior.sample_mu_R(data_len)
         return mu, R
 
+    def get_expt(self, by_posterior=True):
+        '''
+        mu, R = mur.get_expt(by_posterior=True)
+        '''
+        if by_posterior:
+            mu = self.post.mu
+            R = self.post.expt_prec
+        else:
+            mu = self.prior.mu
+            R = self.prior.expt_prec
+        return mu, R
+
     def get_param_dict(self, by_posterior=True):
         if by_posterior:
             prm = self.post.get_param_dict()
@@ -256,6 +268,18 @@ class qPi(object):
         else:
             alpha = self.prior.sample(data_len)
         return alpha
+
+    def get_expt(self, by_posterior=True):
+        '''
+        pi.get_expt(by_posterior=True)
+        @argvs
+        by_posterior: from posterior(True) or prior(False)
+        '''
+        if by_posterior:
+            pi = self.post.expt
+        else:
+            pi = self.prior.expt
+        return pi
 
 
 class Theta(object):
@@ -385,12 +409,18 @@ class Theta(object):
         @argv
         by_posterior: flag to sample from posterior or prior
         '''
-        if by_posterior:
-            mu, R = self.qmur.post.sample_mu_R()
-            pi = self.qpi.post.sample()
-        else:
-            mu, R = self.qmur.prior.sample_mu_R()
-            pi = self.qpi.prior.sample()
+        mu, R = self.qmur.get_samples(by_posterior=by_posterior)
+        pi = self.pi.get_samples(by_posterior=by_posterior)
+        return mu, R, pi
+
+    def get_expt(self, by_posterior=True):
+        '''
+        theta.get_expt()
+        @argv
+        by_posterior: flag to sample from posterior or prior
+        '''
+        mu, R = self.qmur.get_expt(by_posterior)
+        pi = self.qpi.get_expt(by_posterior)
         return mu, R, pi
 
 
@@ -599,7 +629,8 @@ class Gmm(CheckTools):
         pi: sampled pi, np.array(n_states)
         '''
         by_posterior = argvs.get('by_posterior', True)
-        mu, R, pi = self.theta.get_samples(by_posterior)
+        # mu, R, pi = self.theta.get_samples(by_posterior)
+        mu, R, pi = self.theta.get_expt(by_posterior)
         S = self.qs.get_samples(data_len, pi)
         Y = zeros((self.data_dim, data_len))
         cov = inv(R.transpose(2, 0, 1)).transpose(1, 2, 0)
