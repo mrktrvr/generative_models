@@ -78,11 +78,9 @@ class ParamNormalWishart(object):
     def _gen_beta(self):
         self.beta = ones(self.n_states) * 1e+0
 
-    def _gen_W(self, c=1e-1):
-        from scipy.stats import wishart
-        mat = eye(self.data_dim) * c
-        # mat = ones(self.data_dim) * c
-        self.W = wishart.rvs(self.data_dim, mat, size=self.n_states)
+    def _gen_W(self, c=1e-1, by_eye=True):
+        from util.calc_util import rand_wishart
+        self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
         self.W = self.W.transpose(1, 2, 0)
 
     def _gen_nu(self):

@@ -209,6 +209,8 @@ class PlotModels():
         idx1 = args.get('idx1', 0)
         idx2 = args.get('idx2', 1)
         lbls = args.get('lbls', None)
+        if src.shape[0] == 1:
+            idx1 = idx2 = 0
         xlim = (src[idx1].min(), src[idx1].max())
         ylim = (src[idx2].min(), src[idx2].max())
         self.ax = self.get_ax(pos, rspan=rspan, cspan=cspan)

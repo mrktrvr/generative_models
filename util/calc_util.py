@@ -39,7 +39,7 @@ def logdet(src):
             logger.error('dim %d is not supprted.' % src.ndim)
     except Exception as e:
         from numpy.linalg import slogdet
-        # logger.warn(e)
+        logger.info(e)
         ldt, sgn = slogdet(src)
         dst = sgn * ldt
     return dst
@@ -87,6 +87,28 @@ def logmatprod(ln_a, ln_b):
         for j in xrange(J):
             ln_C[i, j] = logsumexp(ln_a[i] + ln_b[:, j], -1)
     return ln_C
+
+
+def rand_wishart(data_dim, n_states, c=1e+0, by_eye=True):
+    '''
+    @argv
+    data_dim: data_dim
+    n_states: n_states
+    @return
+    W: array(data_dim, data_dim, n_states)
+    '''
+    from scipy.stats import wishart
+    if by_eye:
+        from numpy import eye
+        W = wishart.rvs(data_dim, eye(data_dim) * c, size=n_states)
+    else:
+        from numpy import ones
+        W = wishart.rvs(data_dim, ones(data_dim) * c, size=n_states)
+    if data_dim == 1:
+        W = W.reshape(1, 1, n_states)
+    else:
+        W = W.transpose(1, 2, 0)
+    return W
 
 
 def main_inv_det():

@@ -555,18 +555,12 @@ def _plotter_core(y, s, prm, vbs, prm_type_str, figno):
 
 
 def gen_data(data_dim, n_states, data_len):
+    from util.calc_util import rand_wishart
     from numpy.random import randn
-    from scipy.stats import wishart
     hmm = Hmm(data_dim, n_states, expt_init_mode='random')
     hmm.set_default_params()
     mu = randn(data_dim, n_states) * 10
-    c = 1
-    if False:
-        from numpy import eye
-        W = wishart.rvs(data_dim, c * eye(data_dim), size=n_states)
-    else:
-        W = wishart.rvs(data_dim, c * ones(data_dim), size=n_states)
-    W = W.transpose(1, 2, 0)
+    W = rand_wishart(data_dim, n_states, c=1, by_eye=True)
     hmm.set_params({'MuR': {'mu': mu, 'W': W}})
     y, s, _ = hmm.get_samples(data_len)
     # --- plotter
