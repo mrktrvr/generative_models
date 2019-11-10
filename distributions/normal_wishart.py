@@ -16,7 +16,7 @@ from numpy.random import multivariate_normal as mvnrnd
 from scipy.special import digamma
 from scipy.stats import wishart
 
-from default_hyper_params import ParamNormalWishart
+from .default_hyper_params import ParamNormalWishart
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
@@ -296,20 +296,20 @@ def plotter(nw, figno=1):
     pm.multi_bar((0, 1), atleast_2d(nw.beta), title=r'param $\beta$')
     pm.multi_bar((0, 2), atleast_2d(nw.nu), title=r'param $\nu$')
     pm.tight_layout()
-    pm.show()
+    pm.ion_show()
 
 
 def main():
     data_dim = 4
     n_states = 3
     nw = NormalWishart(data_dim, n_states, do_set_prm=True)
-    print nw.mu
-    print nw.beta
-    print nw.nu
-    print nw.W
-    print nw.expt_prec.shape
-    print nw.expt_prec_mu.shape
-    print nw.expt_mu_prec_mu.shape
+    print(nw.mu)
+    print(nw.beta)
+    print(nw.nu)
+    print(nw.W)
+    print(nw.expt_prec.shape)
+    print(nw.expt_prec_mu.shape)
+    print(nw.expt_mu_prec_mu.shape)
     plotter(nw, 1)
 
 

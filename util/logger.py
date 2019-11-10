@@ -10,11 +10,11 @@ from logging import CRITICAL
 
 loggers = {}
 
-# level = 'info'
+level = 'info'
 
 # level = 'debug'
 
-level = 'warn'
+# level = 'warn'
 
 
 def _set_logger_core(name, level, to_file):

@@ -14,7 +14,7 @@ from numpy import newaxis
 from numpy.random import dirichlet
 from scipy.special import digamma
 
-from default_hyper_params import ParamDirichlet
+from .default_hyper_params import ParamDirichlet
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
@@ -191,17 +191,17 @@ if __name__ == '__main__':
     alpha = randint(1, 10, size=n_states)
     dd = Dirichlet(n_states)
     dd.set_params(alpha=alpha)
-    print dd
+    print(dd)
     embed()
     n_states = 5
     alpha = randint(1, 10, size=(n_states, n_states))
     dd = Dirichlet(n_states, n_states)
     dd.set_params(alpha=alpha)
-    print dd
+    print(dd)
     n_states = 5
     data_len = 10
     alpha = randint(1, 10, size=(data_len, n_states))
     dd = Dirichlet(data_len, n_states)
     dd.set_params(alpha=alpha)
-    print dd
+    print(dd)
     embed()

@@ -31,7 +31,7 @@ def KL_Dir(ln_alpha_h, ln_alpha):
     alpha_0 = sum(alpha)
     dig_alpha_0_h = digamma(alpha_0_h)
     val = gammaln(alpha_0_h) - gammaln(alpha_0)
-    for k in xrange(n_states):
+    for k in range(n_states):
         val += gammaln(alpha[k]) - gammaln(alpha_h[k])
         val += (alpha_h[k] - alpha[k]) * (digamma(alpha_h[k]) - dig_alpha_0_h)
     return val
@@ -117,7 +117,7 @@ def KL_Wishart(nu_h, W_h, nu, W):
         invW_wh = dot(invW, W_h)
         val += -0.5 * nu * logdet(invW_wh[newaxis, :, :])
         val += 0.5 * nu_h * (trace(invW_wh) - data_dim)
-        for d in xrange(1, data_dim + 1):
+        for d in range(1, data_dim + 1):
             val += gammaln((nu + 1 - d) / 2.0) - gammaln((nu_h + 1 - d) / 2.0)
             val += (nu_h - nu) * digamma((nu_h + 1.0 - d) / 2.0) / 2.0
     else:
@@ -126,7 +126,7 @@ def KL_Wishart(nu_h, W_h, nu, W):
         val += -0.5 * nu * logdet(invW_Wh)
         val += 0.5 * nu_h * (trace(invW_Wh) - data_dim)
         nuh_nu = nu_h - nu
-        for d in xrange(1, data_dim + 1):
+        for d in range(1, data_dim + 1):
             lngam_nuh_d_2 = gammaln((nu_h + 1.0 - d) / 2.0)
             lngam_nu_d_2 = gammaln(nu + 1.0 - d / 2.0)
             dig_nuh_d_2 = digamma((nu_h + 1.0 - d) / 2.0)

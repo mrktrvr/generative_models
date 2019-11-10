@@ -8,7 +8,7 @@ from numpy import log
 from numpy import exp
 from numpy import einsum
 
-from logger import logger
+from .logger import logger
 
 
 def inv(src):
@@ -52,7 +52,7 @@ def logsumexp(src, axis=None):
     src: np.array(data_len, [data_dim])
     dst: np.array()
     '''
-    from scipy.misc import logsumexp as scipy_lse
+    from scipy.special import logsumexp as scipy_lse
     dst = scipy_lse(src, axis)
     return dst
 
@@ -117,11 +117,11 @@ def main_inv_det():
     data_dim = 4
     n_states = 3
     src = wishart.rvs(data_dim, eye(data_dim), size=n_states)
-    print 'src:\n', src
+    print('src:\n', src)
     dst = inv(src)
-    print 'inv:\n', dst
+    print('inv:\n', dst)
     dst = logdet(src)
-    print 'det:\n', dst
+    print('det:\n', dst)
 
 
 def main_logsumexp():
@@ -131,8 +131,8 @@ def main_logsumexp():
     axis = 1
     src = rand(data_len, data_dim)
     dst = logsumexp(src, axis=axis)
-    print dst
-    print log(exp(src).sum(axis))
+    print(dst)
+    print(log(exp(src).sum(axis)))
 
 
 if __name__ == '__main__':

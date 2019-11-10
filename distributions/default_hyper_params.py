@@ -81,7 +81,6 @@ class ParamNormalWishart(object):
     def _gen_W(self, c=1e-1, by_eye=True):
         from util.calc_util import rand_wishart
         self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
-        self.W = self.W.transpose(1, 2, 0)
 
     def _gen_nu(self):
         self.nu = ones((self.n_states)) * self.data_dim * 1e+1
@@ -118,19 +117,19 @@ def main_multivariate_normal():
     data_dim = 4
     n_states = 3
     prm_mvn = ParamMultivariateNormal(data_dim, n_states)
-    print prm_mvn.mu.shape
-    print prm_mvn.mu
-    print prm_mvn.cov.shape
+    print(prm_mvn.mu.shape)
+    print(prm_mvn.mu)
+    print(prm_mvn.cov.shape)
 
 
 def main_normal_wishart():
     data_dim = 4
     n_states = 3
     prm_nw = ParamNormalWishart(data_dim, n_states)
-    print prm_nw.mu.shape
-    print prm_nw.beta.shape
-    print prm_nw.nu.shape
-    print prm_nw.W.shape
+    print(prm_nw.mu.shape)
+    print(prm_nw.beta.shape)
+    print(prm_nw.nu.shape)
+    print(prm_nw.W.shape)
 
 
 if __name__ == '__main__':

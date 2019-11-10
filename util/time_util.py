@@ -16,7 +16,7 @@ from numpy import roll
 from numpy import array as arr
 from numpy import ndarray as ndarr
 
-from logger import logger
+from .logger import logger
 
 
 class TimeUtil(object):
@@ -574,43 +574,43 @@ def main2():
     adbgn = 2
     adend = 5
     tmp = get_time_range_pairs(dbgn, dend, dur, adbgn, adend)
-    print dbgn, dend, dur, adbgn, adend
+    print(dbgn, dend, dur, adbgn, adend)
     for t1, t2 in tmp:
-        print t1
-        print t2
-        print ''
+        print(t1)
+        print(t2)
+        print('')
 
 
 # -----------------------------------------------------------------------------
 def main():
     tu = TimeUtil()
 
-    print 'time zone:', tu.tzinfo
+    print('time zone:', tu.tzinfo)
 
     #    orgts = '2014-09-01 12:40:00'
     orgts = '1970-01-01 00:00:00'
 
-    print '--------------------------------------------------------'
-    print '%25s' % 'input timestring:', orgts
+    print('--------------------------------------------------------')
+    print('%25s' % 'input timestring:', orgts)
     org2ut = tu.timestr2unixtime(orgts)
     org2dt = tu.timestr2datetime(orgts)
-    print '%25s' % 'timestring to datetime:', org2dt
-    print '%25s' % 'timestring to unixtime:', org2ut
+    print('%25s' % 'timestring to datetime:', org2dt)
+    print('%25s' % 'timestring to unixtime:', org2ut)
 
     timestamp = org2ut
-    print '--------------------------------------------------------'
-    print '%25s' % 'input unixtime:', timestamp
+    print('--------------------------------------------------------')
+    print('%25s' % 'input unixtime:', timestamp)
     ut2str = tu.unixtime2timestr(timestamp, '%Y-%m-%d_%H-%M-%S%z')
     ut2dt = tu.unixtime2datetime(timestamp)
-    print '%25s' % 'unixtime to string:', ut2str
-    print '%25s' % 'unixtime to datetime:', ut2dt
+    print('%25s' % 'unixtime to string:', ut2str)
+    print('%25s' % 'unixtime to datetime:', ut2dt)
 
-    print '--------------------------------------------------------'
-    print '%25s' % 'input datetime:', ut2dt
+    print('--------------------------------------------------------')
+    print('%25s' % 'input datetime:', ut2dt)
     dt2str = tu.datetime2timestr(ut2dt)
     dt2ut = tu.datetime2unixtime(ut2dt)
-    print '%25s' % 'datetime to timestring:', dt2str
-    print '%25s' % 'datetime to unixtime:', dt2ut
+    print('%25s' % 'datetime to timestring:', dt2str)
+    print('%25s' % 'datetime to unixtime:', dt2ut)
 
 
 if __name__ == '__main__':

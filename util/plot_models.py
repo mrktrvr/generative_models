@@ -46,7 +46,7 @@ class PlotModelsGrid():
         self.figsize = (3 * self.n_col, 2 * self.n_row)
 
     def _idx_itr(self):
-        for k in xrange(self.n_clusters):
+        for k in range(self.n_clusters):
             i = k % self.n_col
             j = int(k / self.n_row)
             yield i, j, k
@@ -223,7 +223,7 @@ class PlotModels():
         mk = '.' if mk is None else mk
         n_states = mu.shape[-1] if mu.ndim == 2 else 1
         clr = StateColor(n_states).get_color_list()
-        for k in xrange(n_states):
+        for k in range(n_states):
             x, y = mu[idx1, k], mu[idx2, k]
             self.ax.plot(x, y, 'x', ms=10, color=clr[k], label='state %d' % k)
         self.ax.legend(loc=0)
@@ -231,7 +231,7 @@ class PlotModels():
             self.ax.plot(src[idx1, :], src[idx2, :], mk, alpha=0.1, ms=ms)
         else:
             s = cat.argmax(0) if cat.ndim == 2 else cat
-            for k in xrange(n_states):
+            for k in range(n_states):
                 x, y = src[idx1, s == k], src[idx2, s == k]
                 self.ax.plot(x, y, mk, color=clr[k], alpha=0.5, ms=ms)
 
@@ -279,14 +279,14 @@ class PlotModels():
         if src is not None:
             self._plot_scatter_core(src, mu, idx1, idx2, cat)
         else:
-            for k in xrange(n_states):
+            for k in range(n_states):
                 x, y = mu[idx1, k], mu[idx2, k]
                 self.ax.plot(
                     x, y, 'x', ms=10, color=clr[k], label='state %d' % k)
                 self.ax.legend(loc=0)
 
         # --- mu and cov
-        for k in xrange(n_states):
+        for k in range(n_states):
             ret = self._calc_ellipse_info(mu[:, k], cov[:, :, k], idx1, idx2)
             m, w, h, d = ret
             ellipse = Ellipse(m, w, h, d, color=clr[k], alpha=0.2)
@@ -310,7 +310,7 @@ class PlotModels():
         n_states = src.shape[-1]
         if n_states < 100:
             clr = StateColor(n_states).get_color_list()
-            for k in xrange(n_states):
+            for k in range(n_states):
                 self.ax.plot(src[:, k], color=clr[k])
         else:
             self.ax.plot(src)
@@ -395,7 +395,7 @@ class PlotModels():
         pltx = arange(data_len) if pltx is None else pltx
         v = expt * ymax
         colors = StateColor(n_states).get_color_list()
-        lbls = ['%d(%d)' % (k, len(sidx[sidx == k])) for k in xrange(n_states)]
+        lbls = ['%d(%d)' % (k, len(sidx[sidx == k])) for k in range(n_states)]
         self.ax.stackplot(
             pltx, v, colors=colors, alpha=0.5, labels=lbls, baseline='zero')
         xlbl = 'sequence'
@@ -424,7 +424,7 @@ class PlotModels():
         cols = sc_cls.get_color_list(True)
         pltx = arange(data_len) if pltx is None else pltx
         btm = ones(data_len)
-        for k in xrange(n_states):
+        for k in range(n_states):
             c = cols[k]
             top = ones(data_len) * k
             # top[sidx == k] += 1
@@ -468,7 +468,7 @@ class PlotModels():
         n_bars, n_multi = src.shape
         w = (1.0 - 2 * margin) / n_multi
         clist = StateColor(n_multi).get_color_list()
-        for i in xrange(n_multi):
+        for i in range(n_multi):
             shift = (w / 2.0 + w * i)
             x = arange(n_bars) + shift + margin
             y = src[:, i]
@@ -478,7 +478,7 @@ class PlotModels():
             self.ax.legend(leg_list, fontsize=self.f_size)
         # --- splitter
         ymax = nanmax(src)
-        for j in xrange(n_bars):
+        for j in range(n_bars):
             self.ax.plot([j, j], [0, ymax], 'k--', lw=0.3)
         xticks = arange(n_bars) if xticks is None else xticks
         self.ax.set_xticks(arange(n_bars) + 0.5)
@@ -502,17 +502,17 @@ class PlotModels():
         self.ax = self.get_ax(pos, rspan=rspan, cspan=cspan)
         ndim = src.ndim
         n_states = src.shape[0]
-        rows = ['k:%d' % x for x in xrange(n_states)]
+        rows = ['k:%d' % x for x in range(n_states)]
         if ndim == 1:
             cell = [[fmt % a for a in src]]
             cols = None
             colw = ones(len(cell[0])) * 0.6
         elif ndim == 2:
-            cell = [[fmt % v for v in src[k]] for k in xrange(n_states)]
+            cell = [[fmt % v for v in src[k]] for k in range(n_states)]
             if True:
                 cell.append([fmt % v for v in src.sum(0)])
                 rows += ['sum']
-            cols = ['prv k:%d' % xx for xx in xrange(n_states)]
+            cols = ['prv k:%d' % xx for xx in range(n_states)]
             colw = ones(n_states) / float(n_states)
         else:
             logger.error('ndim %d not supported' % ndim)
@@ -585,7 +585,7 @@ def main_plot_multi_bar():
     n_states = 8
     n_cat = 3
     pi = dirichlet(ones(n_states), size=n_cat).T
-    print pi
+    print(pi)
     pm = PlotModels(1, 1, 1)
     pm.multi_bar((0, 0), pi)
     embed(header='main_plot_multi_bar')

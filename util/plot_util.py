@@ -27,7 +27,7 @@ class StateColor:
         self._prepare_color_list()
 
     def _prepare_color_list(self):
-        dst = [self.col_map(k / (self.denom)) for k in xrange(self.n_states)]
+        dst = [self.col_map(k / (self.denom)) for k in range(self.n_states)]
         if self.alternate:
             tmp = [None] * len(dst)
             tmp[::2] = dst[::2]
@@ -91,7 +91,7 @@ class Markers():
         n_mks: number of makers
         '''
         m = self.filled()
-        dst = [m.next() for nn in xrange(n_mks)]
+        dst = [m.next() for nn in range(n_mks)]
         return dst
 
 

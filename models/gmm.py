@@ -5,7 +5,8 @@ gmm.py
 '''
 import os
 import sys
-import cPickle as pickle
+# import cPickle as pickle
+import pickle
 
 from numpy import newaxis
 from numpy import nan
@@ -135,7 +136,7 @@ class qMuR():
     def calc_kl_divergence(self):
         from distributions.kl_divergence import KL_Norm_Wish
         kl_norm_wish = 0
-        for k in xrange(self.n_states):
+        for k in range(self.n_states):
             kl_norm_wish += KL_Norm_Wish(
                 self.post.beta[k], self.post.mu[:, k], self.post.nu[k],
                 self.post.W[:, :, k], self.prior.beta[k], self.prior.mu[:, k],
@@ -495,7 +496,7 @@ class qS(object):
         S = zeros(data_len, dtype=int)
         if pi is None:
             pi = ones(self.n_states, dtype=float) / self.n_states
-        for t in xrange(data_len):
+        for t in range(data_len):
             k = choice(self.n_states, p=pi)
             S[t] = k
         return S
@@ -577,7 +578,7 @@ class Gmm(CheckTools):
         '''
         self.data_dim, data_len = Y.shape
         self.init_expt_s(data_len)
-        for i in xrange(self.max_em_itr):
+        for i in range(self.max_em_itr):
             self.log_info_update_itr(self.max_em_itr, i)
             for j, uo in enumerate(self.update_order):
                 if uo == 'E':
@@ -634,7 +635,7 @@ class Gmm(CheckTools):
         S = self.qs.get_samples(data_len, pi)
         Y = zeros((self.data_dim, data_len))
         cov = inv(R.transpose(2, 0, 1)).transpose(1, 2, 0)
-        for t in xrange(data_len):
+        for t in range(data_len):
             k = S[t]
             Y[:, t] = mvnrand(mu[:, k], cov[:, :, k])
         return Y, S, [mu, R, pi]
