@@ -4,4 +4,3 @@ generative_models
 - MFA
 - GMM
 - HMM
-$\symbol{M}$
