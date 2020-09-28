@@ -18,7 +18,7 @@ from numpy import sum as nsum
 from numpy import einsum
 from numpy.random import multivariate_normal as mvnrnd
 
-import cPickle as pickle
+import pickle
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 lib_root = os.path.join(cdir, '..')
@@ -35,7 +35,6 @@ class qZ(object):
     '''
     z = qZ(data_len, fa_dim)
     '''
-
     def __init__(self, fa_dim):
         '''
         '''
@@ -105,7 +104,7 @@ class qZ(object):
             sample_z = ones((self.aug_dim, data_len)) * nan
             mu_len = 0 if self.mu is None else self.mu.shape[-1]
             t_max = data_len if data_len < mu_len else mu_len
-            for t in xrange(t_max):
+            for t in range(t_max):
                 sample_z[:, t] = mvnrnd(self.mu[:, t], self.cov)
             t_rest = data_len - t_max
             if t_rest > 0:
@@ -124,7 +123,6 @@ class qLamb(object):
     lamb = qLamb(fa_dim, data_dim)
     q(Lamb) = N(Lamb | mean, cov)
     '''
-
     def __init__(self, fa_dim, data_dim, do_set_prm=False):
         '''
         mean: array(aug_dim, data_dim)
@@ -144,8 +142,8 @@ class qLamb(object):
         '''
         lamb.set_default_params()
         '''
-        pm, pc = DefaultFaParams().Lamb(
-            self.fa_dim, self.data_dim, self.n_states)
+        pm, pc = DefaultFaParams().Lamb(self.fa_dim, self.data_dim,
+                                        self.n_states)
         self.set_params(mu=pm, cov=pc)
 
     def set_params(self, **argvs):
@@ -203,7 +201,6 @@ class qR(object):
     q(R) = Ga(R | a, b)
     <R> = a / b
     '''
-
     def __init__(self, data_dim, do_set_prm=False):
         '''
         a: array(data_dim, 1)
@@ -277,7 +274,6 @@ class Theta(object):
     '''
     theta = Theta(fa_dim, data_dim)
     '''
-
     def __init__(self, fa_dim, data_dim):
         '''
         theta = Theta(fa_dim, data_dim)
@@ -379,7 +375,6 @@ class Fa(object):
     '''
     fa = Fa(fa_dim)
     '''
-
     def __init__(self, fa_dim, data_dim, **argvs):
         '''
         '''
@@ -425,10 +420,9 @@ class Fa(object):
         '''
         fa.update(Y)
         '''
-        logger.info(
-            'update order %s, in Theta %s' %
-            (self.update_order, self.theta.update_order))
-        for i in xrange(self.max_itr):
+        logger.info('update order %s, in Theta %s' %
+                    (self.update_order, self.theta.update_order))
+        for i in range(self.max_itr):
             for j, uo in enumerate(self.update_order):
                 if uo == 'Z':
                     self.z.update(self.theta, Y)
@@ -483,7 +477,7 @@ class Fa(object):
         y = zeros((self.data_dim, data_len))
         mu = einsum('ld,lt->dt', lamb[:, :, 0], z)
         cov = inv(prec[:, :, 0])
-        for t in xrange(data_len):
+        for t in range(data_len):
             y[:, t] = mvnrnd(mu[:, t], cov)
         return y, z, [lamb, prec, cov]
 
@@ -514,14 +508,14 @@ def main():
     fa.set_default_params()
     # fa.init_z(data_len)
     Y, Z, prms = fa.get_samples(data_len)
-    plotter(Y, Z, prms, 1)
+    # plotter(Y, Z, prms, 1)
     # --- update
     fa = Fa(fa_dim, data_dim)
     fa.set_default_params()
     # fa.init_z(data_len)
     fa.update(Y)
     Y, Z, prms = fa.get_samples(data_len)
-    plotter(Y, Z, prms, 2)
+    # plotter(Y, Z, prms, 2)
     plt.pause(1)
 
 

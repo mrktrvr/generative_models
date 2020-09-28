@@ -18,11 +18,11 @@ from numpy import diag
 from numpy.random import multivariate_normal as mvnrnd
 from numpy.random import normal as uvnrnd
 
-from default_hyper_params import ParamMultivariateNormal
+CDIR = os.path.abspath(os.path.dirname(__file__))
 
-cdir = os.path.abspath(os.path.dirname(__file__))
-lib_root = os.path.join(cdir, '..')
-sys.path.append(lib_root)
+LIB_ROOT = os.path.join(CDIR, '..')
+sys.path.append(LIB_ROOT)
+from distributions.default_hyper_params import ParamMultivariateNormal
 from util.calc_util import inv
 from util.calc_util import logsumexp
 from util.calc_util import logdet
@@ -34,7 +34,6 @@ class MultivariateNormal(object):
     mvn = MultivaliateNormal(data_dim, n_states=1)
     mvn.set_params(mean=mu, cov=cov, prec=prec)
     '''
-
     def __init__(self, data_dim, n_states=1, do_set_prm=False):
         '''
         p(Y|mu, cov) = N(Y|mu, cov)
@@ -272,30 +271,32 @@ class MultivariateNormal(object):
         elif self.mu.ndim == 2:
             dst = zeros((data_len, self.mu.shape[0], self.mu.shape[1]))
             if self.cov.ndim == 2:
-                for k in xrange(self.mu.shape[-1]):
-                    dst[:, :, k] = mvnrnd(
-                        self.mu[:, k], self.cov, size=data_len)
+                for k in range(self.mu.shape[-1]):
+                    dst[:, :, k] = mvnrnd(self.mu[:, k],
+                                          self.cov,
+                                          size=data_len)
             elif self.cov.ndim == 3:
-                for k in xrange(self.mu.shape[-1]):
-                    dst[:, :, k] = mvnrnd(
-                        self.mu[:, k], self.cov[:, :, k], size=data_len)
+                for k in range(self.mu.shape[-1]):
+                    dst[:, :, k] = mvnrnd(self.mu[:, k],
+                                          self.cov[:, :, k],
+                                          size=data_len)
             else:
                 self._log_error_not_supported()
         elif self.mu.ndim == 3:
             if self.cov.ndim == 3:
-                for d in xrange(self.mu.shape[-2]):
-                    for k in xrange(self.mu.shape[-1]):
-                        dst[:, d, k] = mvnrnd(
-                            self.mu[d, k], self.cov[:, :, k], size=data_len)
+                for d in range(self.mu.shape[-2]):
+                    for k in range(self.mu.shape[-1]):
+                        dst[:, d, k] = mvnrnd(self.mu[d, k],
+                                              self.cov[:, :, k],
+                                              size=data_len)
             elif self.cov.ndim == 4:
                 aug_dim, data_dim, n_states = self.mu.shape
                 dst = zeros((data_len, aug_dim, data_dim, n_states))
-                for d in xrange(data_dim):
-                    for k in xrange(n_states):
-                        dst[:, :, d, k] = mvnrnd(
-                            self.mu[:, d, k],
-                            self.cov[:, :, d, k],
-                            size=data_len)
+                for d in range(data_dim):
+                    for k in range(n_states):
+                        dst[:, :, d, k] = mvnrnd(self.mu[:, d, k],
+                                                 self.cov[:, :, d, k],
+                                                 size=data_len)
             else:
                 self._log_error_not_supported()
         else:
@@ -317,9 +318,8 @@ class MultivariateNormal(object):
         return ln_lkh
 
     def _log_error_not_supported(self):
-        logger.error(
-            'mean and prec of ndim (%d, %d) not supported' %
-            (self.mu.ndim, self.cov.ndim))
+        logger.error('mean and prec of ndim (%d, %d) not supported' %
+                     (self.mu.ndim, self.cov.ndim))
 
     def __str__(self):
         res = '-' * 7
@@ -338,8 +338,8 @@ if __name__ == '__main__':
     data_dim = 4
     n_states = 3
     mvn = MultivariateNormal(data_dim, n_states, do_set_prm=True)
-    print mvn
-    print mvn.mu
-    print mvn.cov
+    print(mvn)
+    print(mvn.mu)
+    print(mvn.cov)
     samp_mu = mvn.sample(100)
-    print samp_mu
+    print(samp_mu)

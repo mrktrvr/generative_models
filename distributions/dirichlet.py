@@ -26,7 +26,6 @@ class Dirichlet(object):
     '''
     Dirichlet()
     '''
-
     def __init__(self, n_states, len_2d=0, do_set_prm=False):
         '''
         n_states: number of states
@@ -110,10 +109,10 @@ class Dirichlet(object):
             dst = zeros((self.n_states, self.len_2d, data_len))
             if self.alpha.shape[0] == self.alpha.shape[1]:
                 dst = zeros((self.n_states, self.len_2d, data_len))
-                for k in xrange(self.alpha.shape[0]):
+                for k in range(self.alpha.shape[0]):
                     dst[:, k] = dirichlet(self.alpha[:, k], size=data_len).T
             else:
-                for k in xrange(self.len_2d):
+                for k in range(self.len_2d):
                     dst[:, k, :] = dirichlet(self.alpha[:, k], size=data_len).T
             if data_len == 1:
                 dst = dst[:, :, 0]
@@ -144,7 +143,7 @@ class Dirichlet(object):
             dst = [[fmt % a for a in src]]
         elif src.ndim == 2:
             dst = []
-            for k in xrange(src.shape[0]):
+            for k in range(src.shape[0]):
                 dst.append([fmt % a for a in src[k]])
         else:
             logger.error('ndim %d is not supported' % src.ndim)
@@ -162,25 +161,24 @@ class Dirichlet(object):
         import matplotlib.pyplot as plt
         ndim = self.alpha.ndim
         n_states = self.alpha.shape[0]
-        rows = ['k:%d' % x for x in xrange(n_states)]
+        rows = ['k:%d' % x for x in range(n_states)]
         if ndim == 1:
             cell = zip(*self.alpha_str_list(fmt=fmt))
             cols = None
             colw = ones(len(cell[0])) * 0.6
         elif ndim == 2:
             cell = self.alpha_str_list(fmt=fmt)
-            cols = ['prv k:%d' % xx for xx in xrange(n_states)]
+            cols = ['prv k:%d' % xx for xx in range(n_states)]
             colw = ones(n_states) / float(n_states)
         else:
             logger.error('ndim %d not supported' % ndim)
-        plt.table(
-            cellText=cell,
-            rowLabels=rows,
-            colLabels=cols,
-            colWidths=colw,
-            loc='center',
-            cellLoc='center',
-            colLoc='center')
+        plt.table(cellText=cell,
+                  rowLabels=rows,
+                  colLabels=cols,
+                  colWidths=colw,
+                  loc='center',
+                  cellLoc='center',
+                  colLoc='center')
         plt.axis('off')
 
 

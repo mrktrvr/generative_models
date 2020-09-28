@@ -6,7 +6,7 @@ lda.py
 import os
 import sys
 
-import cPickle as pickle
+import pickle
 
 from numpy import newaxis
 from numpy import zeros
@@ -40,7 +40,7 @@ def idx_seq_to_full_array(src, n_states):
     data_len = src.shape[-1]
     if src.ndim == 1:
         dst = zeros((n_states, data_len))
-        for k in xrange(n_states):
+        for k in range(n_states):
             dst[k, src == k] = 1
     else:
         dst = src
@@ -57,8 +57,8 @@ def calc_tf_idf(s_list, n_states):
     tf: np.array(n_states, len(s_list))
     idf: np.array(n_states)
     '''
-    n_state_in_batch = arr(
-        [[len(s[s == k]) for k in xrange(n_states)] for s in s_list])
+    n_state_in_batch = arr([[len(s[s == k]) for k in range(n_states)]
+                            for s in s_list])
     n_in_batch = arr([len(s) for s in s_list], dtype=float)
     tf = n_state_in_batch / n_in_batch[:, newaxis]
     tf = tf.T
@@ -77,7 +77,6 @@ class qPi(object):
     '''
     qpi = qPi(n_states, n_cat)
     '''
-
     def __init__(self, n_states, n_cat):
         '''
         qpi = qPi(n_states, n_cat)
@@ -194,7 +193,6 @@ class qZ(gmm_qs):
     '''
     qz = qZ(n_cat)
     '''
-
     def __init__(self, n_cat):
         '''
         qz = qz(n_cat)
@@ -249,7 +247,7 @@ class qZ(gmm_qs):
         z: np.array(data_len)
         '''
         z = zeros(data_len, dtype=int)
-        for t in xrange(data_len):
+        for t in range(data_len):
             z[t] = choice(self.n_cat, p=phi)
         return z
 
@@ -263,7 +261,6 @@ class qZ(gmm_qs):
 class Lda(CheckTools):
     '''
     '''
-
     def __init__(self, n_states, n_cat, **argvs):
         '''
         n_states: number of states, int
@@ -289,11 +286,11 @@ class Lda(CheckTools):
 
     def init_qphi(self, n_batches):
         if self.qphi_list is None or len(self.qphi_list) != n_batches:
-            self.qphi_list = [qPhi(self.n_cat) for b in xrange(n_batches)]
+            self.qphi_list = [qPhi(self.n_cat) for b in range(n_batches)]
 
     def init_qz(self, n_batches):
         if self.qz_list is None or len(self.qz_list) != n_batches:
-            self.qz_list = [qZ(self.n_cat) for b in xrange(n_batches)]
+            self.qz_list = [qZ(self.n_cat) for b in range(n_batches)]
 
     def clear_qphi_qz(self):
         self.qphi_list = None
@@ -308,7 +305,7 @@ class Lda(CheckTools):
     def set_default_params(self, n_batches):
         self.qpi.set_default_params()
         self.init_qphi(n_batches)
-        for b in xrange(n_batches):
+        for b in range(n_batches):
             self.qphi_list[b].set_default_params()
 
     def set_params(self, prms):
@@ -321,22 +318,22 @@ class Lda(CheckTools):
                 self.qphi_list[b].set_params(**p)
 
     def _print_params(self, i, tar_list=['Phi', 'Z', 'Pi']):
-        print '--- itr %d %s' % (i, tar_list)
+        print('--- itr %d %s' % (i, tar_list))
         if 'Phi' in tar_list:
-            print 'qphi post (n_batches x n_cat)'
-            for b in xrange(self.n_batches):
-                print self.qphi_list[b].post.expt
-            print 'qphi prior (n_batches x n_cat)'
-            for b in xrange(self.n_batches):
-                print self.qphi_list[b].prior.expt
+            print('qphi post (n_batches x n_cat)')
+            for b in range(self.n_batches):
+                print(self.qphi_list[b].post.expt)
+            print('qphi prior (n_batches x n_cat)')
+            for b in range(self.n_batches):
+                print(self.qphi_list[b].prior.expt)
         if 'Z' in tar_list:
-            print 'qz (n_batches x n_cat)'
-            for b in xrange(self.n_batches):
-                print self.qz_list[b].expt.sum(1)
+            print('qz (n_batches x n_cat)')
+            for b in range(self.n_batches):
+                print(self.qz_list[b].expt.sum(1))
         if 'Pi' in tar_list:
-            print 'qpi.post(n_states x n_cat)\n', self.qpi.post.expt.T
-            print 'qpi.prior(n_states x n_cat)\n', self.qpi.prior.expt.T
-        print '---'
+            print('qpi.post(n_states x n_cat)\n', self.qpi.post.expt.T)
+            print('qpi.prior(n_states x n_cat)\n', self.qpi.prior.expt.T)
+        print('---')
 
     def update(self, s_list):
         '''
@@ -365,17 +362,17 @@ class Lda(CheckTools):
 
     def _update_core(self, s_list, update_order, n_itr):
         logger.info('order:%s, itr: %d' % (update_order, n_itr))
-        for i in xrange(n_itr):
+        for i in range(n_itr):
             if i % 10 == 0:
                 logger.info('itr %3d of %3d' % (i, n_itr))
             for uo in update_order:
                 if uo == 'Phi':
-                    for b in xrange(len(self.qphi_list)):
+                    for b in range(len(self.qphi_list)):
                         self.qphi_list[b].update(self.qz_list[b].expt)
                 elif uo == 'Z':
-                    for b in xrange(len(self.qz_list)):
-                        self.qz_list[b].update(
-                            s_list[b], self.qpi, self.qphi_list[b], self.tfidf)
+                    for b in range(len(self.qz_list)):
+                        self.qz_list[b].update(s_list[b], self.qpi,
+                                               self.qphi_list[b], self.tfidf)
                 elif uo == 'Pi':
                     s = concatenate(s_list, 0 if s_list[0].ndim == 1 else 1)
                     z = concatenate([x.expt for x in self.qz_list], 1)
@@ -396,7 +393,7 @@ class Lda(CheckTools):
             phi_b = self.qphi_list[b].get_samples(1, by_posterior)
             z_b = self.qz_list[b].get_samples(dl, phi_b)
             s_b = zeros(dl, dtype=int)
-            for t in xrange(dl):
+            for t in range(dl):
                 s_b[t] = choice(self.n_states, p=pi[:, z_b[t]])
             s.append(s_b)
             z.append(z_b)
@@ -488,11 +485,11 @@ def gen_data(n_batches=32, n_states=8, n_cat=4, do_plot=True, do_print=False):
     from numpy.random import randint
     data_len_list = [180] * n_batches
     alpha_pi = ones((n_states, n_cat))
-    for k in xrange(n_states):
+    for k in range(n_states):
         c = randint(n_cat)
         alpha_pi[k, c] += 10
     alpha_phi = ones((n_batches, n_cat))
-    for b in xrange(n_batches):
+    for b in range(n_batches):
         c = randint(n_cat)
         alpha_phi[b, c] += 10
         c = randint(n_cat)
@@ -509,12 +506,12 @@ def gen_data(n_batches=32, n_states=8, n_cat=4, do_plot=True, do_print=False):
     lda.set_params(prms)
     s_list, z_list, prms = lda.get_samples(data_len_list)
     if do_print:
-        print 's'
-        for b in xrange(n_batches):
-            print idx_seq_to_full_array(s_list[b], n_states).sum(1)
-        print 'z'
-        for b in xrange(n_batches):
-            print idx_seq_to_full_array(z_list[b], n_cat).sum(1)
+        print('s')
+        for b in range(n_batches):
+            print(idx_seq_to_full_array(s_list[b], n_states).sum(1))
+        print('z')
+        for b in range(n_batches):
+            print(idx_seq_to_full_array(z_list[b], n_cat).sum(1))
     return s_list, n_states, n_cat, z_list, prms
 
 

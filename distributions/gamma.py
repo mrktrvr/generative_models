@@ -15,10 +15,10 @@ from scipy.special import digamma
 
 from IPython import embed
 
-from default_hyper_params import ParamGamma
-
-cdir = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(os.path.join(cdir, '..'))
+CDIR = os.path.abspath(os.path.dirname(__file__))
+LIB_ROOT = os.path.join(CDIR, '..')
+sys.path.append(LIB_ROOT)
+from distributions.default_hyper_params import ParamGamma
 from util.calc_util import inv
 from util.calc_util import logsumexp
 from util.logger import logger
@@ -28,7 +28,6 @@ class Gamma:
     '''
     gd = Gamma(n_states)
     '''
-
     def __init__(self, n_states, data_dim=1, do_set_prm=False):
         '''
         keywords
@@ -158,11 +157,11 @@ class Gamma:
             dst = [[fmt % a for a in src]]
         elif src.ndim == 2:
             dst = []
-            for k in xrange(src.shape[-1]):
+            for k in range(src.shape[-1]):
                 dst.append([fmt % a for a in src[:, k]])
         elif src.ndim == 3:
             dst = []
-            for k in xrange(src.shape[-1]):
+            for k in range(src.shape[-1]):
                 dst.append([fmt % a for a in diag(src[:, :, k])])
         else:
             logger.error('ndim %d is not supported' % src.ndim)
@@ -183,5 +182,5 @@ if __name__ == '__main__':
     a = ones((data_dim, n_states)) * 1e+3
     b = ones((data_dim, n_states))
     gd = Gamma(a=a, b=b)
-    print gd
+    print(gd)
     embed(header=__file__)
