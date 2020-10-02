@@ -21,6 +21,26 @@ def inv(src):
     return dst
 
 
+def calc_lndet(src):
+    '''
+    src = logdet(src)
+    src: array(d, d) or array(n, d, d) or array(l, n, d, d)
+    dst: float or array(n)
+    '''
+    if src.ndim == 1:
+        dst = src
+    elif src.ndim == 2:
+        dst = logdet(src)
+    elif src.ndim == 3:
+        dst = logdet(src.transpose(2, 0, 1))
+    elif src.ndim == 4:
+        dst = logdet(src.transpose(2, 3, 0, 1))
+    else:
+        logger.error('src.ndim %d not supported' % src.ndima)
+        dst = None
+    return dst
+
+
 def logdet(src):
     '''
     src = logdet(src)
@@ -63,7 +83,7 @@ def calc_prec_mu(cov, mu):
     mu: np.array(data_dim, n)x)
     '''
     from numpy.linalg import solve
-    dst = arr([solve(cov[:, :, k], mu[:, k]) for k in xrange(mu.shape[-1])]).T
+    dst = arr([solve(cov[:, :, k], mu[:, k]) for k in range(mu.shape[-1])]).T
     return dst
 
 
@@ -83,8 +103,8 @@ def logmatprod(ln_a, ln_b):
     I = ln_a.shape[0]
     J = ln_b.shape[1]
     ln_C = zeros((I, J))
-    for i in xrange(I):
-        for j in xrange(J):
+    for i in range(I):
+        for j in range(J):
             ln_C[i, j] = logsumexp(ln_a[i] + ln_b[:, j], -1)
     return ln_C
 

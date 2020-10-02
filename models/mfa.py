@@ -5,7 +5,7 @@ mfa.py
 '''
 import os
 import sys
-import cPickle as pickle
+import pickle
 
 from numpy import pi as np_pi
 from numpy import nan
@@ -32,8 +32,6 @@ from util.logger import logger
 from util.calc_util import inv
 from util.calc_util import logdet
 from util.calc_util import logsumexp
-from distributions.multivariate_normal import MultivariateNormal
-from distributions.gamma import Gamma
 
 
 class qZS(FaZ):
@@ -91,18 +89,18 @@ class qZS(FaZ):
         @argvs
         Y: array(data_dim, data_len)
         lamb.mu: <lamb> array(aug_dim, data_dim)
-        lamb.post.mu2: <lamblambT> array(aug_dim, aug_dim, data_dim)
+        lamb.post.expt2: <lamblambT> array(aug_dim, aug_dim, data_dim)
         r.post.expt: <R> array(data_dim)
         lamb.post.mu: <lamb> array(aug_dim, data_dim)
         '''
         # -- prc
-        rll = einsum('ddk,ljdk->ljk', theta.r.post.expt, theta.lamb.post.mu2)
+        rll = einsum('ddk,ljdk->ljk', theta.r.post.expt, theta.lamb.post.expt2)
         z_prc = self.prior.prec + rll
         # --- cov
         self.z_cov = inv(z_prc.transpose(2, 0, 1)).transpose(1, 2, 0)
         # --- mu
-        ylr = einsum(
-            'dt,ldk,ddk->lkt', Y, theta.lamb.post.mu, theta.r.post.expt)
+        ylr = einsum('dt,ldk,ddk->lkt', Y, theta.lamb.post.mu,
+                     theta.r.post.expt)
         ylr_zmu = ylr + self.prior.expt_prec_mu[:, :, newaxis]
         self.z_mu = einsum('ljk,jkt->lkt', self.z_cov, ylr_zmu)
         # --- update s
@@ -132,7 +130,7 @@ class qZS(FaZ):
             z[-1, :, :] = 1
             mu_len = 0 if self.z_mu is None else self.z_mu.shape[-1]
             t_max = data_len if data_len < mu_len else mu_len
-            for t in xrange(t_max):
+            for t in range(t_max):
                 k = s[t]
                 z[:, k, t] = mvnrnd(self.z_mu[:, k, t], self.z_cov[:, :, k])
             t_rest = data_len - t_max
@@ -193,7 +191,7 @@ class qLamb(FaLamb):
         mu: <Lamb> (aug_dim, data_dim, n_states)
         cov: cov<Lamb> (aug_dim, aug_dim, data_dim, n_states)
         prc: inv(cov<Lamb>) (aug_dim, aug_dim, data_dim, n_states)
-        mu2: <LambLamb'> = <Lamb><Lamb>'+ cov
+        expt2: <LambLamb'> = <Lamb><Lamb>'+ cov
         '''
         super(qLamb, self).__init__(fa_dim, data_dim, False)
         self.n_states = n_states
@@ -257,7 +255,7 @@ class qR(FaR):
         a = self.prior.a + 0.5 * einsum('kt->k', s)
         # --- b
         yszl = einsum('dlk,ldk->dk', sum_ysz, lamb.post.mu)
-        tr_szzll = einsum('ljk,ljdk->dk', sum_szz, lamb.post.mu2)
+        tr_szzll = einsum('ljk,ljdk->dk', sum_szz, lamb.post.expt2)
         b = self.prior.b + 0.5 * (sum_yys - 2.0 * yszl + tr_szzll)
         self.post.set_params(a=a, b=b)
 
@@ -449,10 +447,9 @@ class Mfa:
         @argvs
         Y: np.array(data_dim, data_len)
         '''
-        logger.info(
-            'update order %s, in Theta %s' %
-            (self.update_order, self.theta.update_order))
-        for i in xrange(self.max_itr):
+        logger.info('update order %s, in Theta %s' % (self.update_order,
+                                                      self.theta.update_order))
+        for i in range(self.max_itr):
             for j, uo in enumerate(self.update_order):
                 if uo == 'ZS':
                     self.zs.update(Y, self.theta)
@@ -503,7 +500,7 @@ class Mfa:
         z, s = self.zs.get_samples(data_len, pi, by_posterior)
         y = ones((self.data_dim, data_len)) * nan
         inv_r = inv(r.transpose(2, 0, 1)).transpose(1, 2, 0)
-        for t in xrange(data_len):
+        for t in range(data_len):
             k = s[t]
             mu = einsum('ld,l->d', lamb[:, :, k], z[:, k, t])
             cov = inv_r[:, :, k]
@@ -511,7 +508,7 @@ class Mfa:
         return y, z, s, [lamb, r, inv_r, pi]
 
 
-def plotter(y, z, s, prms, figno=1):
+def plotter(y, z, s, prms, title, figno=1):
     from numpy import diag
     from numpy import array as arr
     from util.plot_models import PlotModels
@@ -520,11 +517,11 @@ def plotter(y, z, s, prms, figno=1):
     n_cols = aug_dim + 1
     pm = PlotModels(3, n_cols, figno)
     # --- Lambda
-    for i in xrange(aug_dim):
+    for i in range(aug_dim):
         pm.plot_2d_array((0, i), l[i, :, :], title='$\Lambda$[%d]' % i)
         pm.ax.legend(['%d' % x for x in range(n_states)], loc=0)
     # --- R
-    tmp = arr([diag(r[:, :, i]) for i in xrange(n_states)]).T
+    tmp = arr([diag(r[:, :, i]) for i in range(n_states)]).T
     pm.plot_2d_array((0, n_cols - 1), tmp, title='R')
     pm.ax.legend(['%d' % x for x in range(n_states)], loc=0)
     # --- Y
@@ -532,10 +529,13 @@ def plotter(y, z, s, prms, figno=1):
     pm.plot_seq((1, 1), y, cat=s, title='Y', cspan=n_cols - 1)
     # --- Z
     data_len = z.shape[-1]
-    zs = arr([z[:, s[t], t] for t in xrange(data_len)]).T
+    zs = arr([z[:, s[t], t] for t in range(data_len)]).T
     pm.plot_2d_array((2, 0), zs, title='Z')
     pm.plot_seq((2, 1), zs, cat=s, title='Z', cspan=n_cols - 1)
     pm.ax.legend(['%d' % x for x in range(z.shape[0])], loc=0)
+    # ---
+    pm.sup_title(title)
+    pm.tight_layout()
 
 
 def main():
@@ -549,13 +549,13 @@ def main():
     mfa.set_default_params()
     mfa.init_zs(data_len)
     Y, Z, S, prms = mfa.get_samples(data_len)
-    plotter(Y, Z, S, prms, 1)
+    plotter(Y, Z, S, prms, 'prior sample', 1)
     # --- update
     mfa = Mfa(fa_dim, data_dim, n_states)
     mfa.set_default_params()
     mfa.update(Y)
     Y, Z, S, prms = mfa.get_samples(data_len)
-    plotter(Y, Z, S, prms, 2)
+    plotter(Y, Z, S, prms, 'posterior sample', 2)
     plt.show()
 
 

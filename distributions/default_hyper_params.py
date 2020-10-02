@@ -17,7 +17,7 @@ lib_root = os.path.join(cdir, '..')
 sys.path.append(lib_root)
 
 
-class ParamMultivariateNormal(object):
+class MultivariateNormalParams(object):
     def __init__(self, data_dim, n_states=1, **kargs):
         '''
         @argvs

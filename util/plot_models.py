@@ -159,8 +159,10 @@ class PlotModels():
         if pltx[0] > 1483228800:
             tu = TimeUtil()
             xtck_lbls = [tu.ut2ts(x) for x in pltx[::xtick_step]]
+            xtck_lbls += [tu.ut2ts(pltx[-1] + 1)]
         else:
             xtck_lbls = [x for x in pltx[::xtick_step]]
+            xtck_lbls += [pltx[-1] + 1]
         self.ax.set_xticks(xtck)
         self.ax.set_xticklabels(xtck_lbls, rotation=90, fontsize=self.f_size)
 
@@ -172,6 +174,12 @@ class PlotModels():
     def ion_show(self):
         plt.ion()
         plt.show()
+
+    def show(self):
+        plt.show()
+
+    def sup_title(self, sup_title):
+        plt.suptitle(sup_title)
 
     def tight_layout(self):
         try:
@@ -315,7 +323,7 @@ class PlotModels():
         else:
             self.ax.plot(src)
         # self.ax.legend(lbls, loc=0)
-        xlim = (-1, src.shape[0])
+        xlim = (-1, src.shape[0] + 1)
         ymax = nanmax(abs(src))
         if baseline == 'zero':
             ylim = (0, ymax)
@@ -355,7 +363,8 @@ class PlotModels():
             else:
                 n_states = cat.shape[0]
                 y = cat
-            lbls = ['%d' % k for k in range(n_states)] if lbls is None else lbls
+            lbls = ['%d' % k
+                    for k in range(n_states)] if lbls is None else lbls
             clr = StateColor(n_states).get_color_list()
             y *= ymax
             self.ax.stackplot(
