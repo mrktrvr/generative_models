@@ -323,7 +323,7 @@ class PlotModels():
         else:
             self.ax.plot(src)
         # self.ax.legend(lbls, loc=0)
-        xlim = (-1, src.shape[0] + 1)
+        xlim = (-1, src.shape[0])
         ymax = nanmax(abs(src))
         if baseline == 'zero':
             ylim = (0, ymax)

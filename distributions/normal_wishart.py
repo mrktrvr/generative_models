@@ -16,7 +16,7 @@ from numpy.random import multivariate_normal as mvnrnd
 from scipy.special import digamma
 from scipy.stats import wishart
 
-from .default_hyper_params import ParamNormalWishart
+from .default_hyper_params import NormalWishartParams
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
@@ -94,7 +94,7 @@ class NormalWishart(object):
         W: data_dim x data_dim x n_states
         inv_W: data_dim x data_dim x n_states
         '''
-        prm_nw = ParamNormalWishart(self.data_dim, self.n_states)
+        prm_nw = NormalWishartParams(self.data_dim, self.n_states)
         # --- beta
         beta = argvs.get('beta', None)
         if beta is not None:

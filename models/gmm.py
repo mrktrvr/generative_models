@@ -444,7 +444,7 @@ class qS(object):
         self.const = 0
         self._eps = 1e-10
 
-    def init_expt(self, data_len):
+    def init_expt(self, data_len, obs=None, mode='random'):
         '''
         qS.init_expt(data_len, argvs)
         @argvs
@@ -452,8 +452,8 @@ class qS(object):
         @self
         expt: (n_states, data_lem)
         '''
-        alpha_pi = ones(self.n_states)
-        expt = dirichlet(alpha_pi, size=data_len).T
+        from model_util import init_expt
+        expt = init_expt(data_len, self.n_states, obs, mode)
         self.set_expt(expt)
 
     def set_expt(self, expt):
@@ -529,6 +529,7 @@ class Gmm(CheckTools):
         # --- learning params
         self.update_order = argvs.get('update_order', ['E', 'M'])
         self.max_em_itr = argvs.get('max_em_itr', 100)
+        self._expt_init_mode = argvs.get('expt_init_mode', 'random')
         # --- variational bounds
         self.vbs = ones(self.max_em_itr) * nan
         self.do_eval = False
@@ -554,12 +555,12 @@ class Gmm(CheckTools):
         self.theta.set_params(prm)
         self.data_dim = self.theta.data_dim
 
-    def init_expt_s(self, data_len):
+    def init_expt_s(self, data_len, obs=None, mode='kmeans'):
         '''
-        gmm.set_expt_s(expt, expt2=None)
+        gmm.init_expt_s(data_len, obs=None, mode='random')
         '''
         if self.qs.expt is None:
-            self.qs.init_expt(data_len)
+            self.qs.init_expt(data_len, obs, mode)
             self.expt_s = self.qs.expt
 
     def set_expt_s(self, expt):
@@ -596,9 +597,8 @@ class Gmm(CheckTools):
         '''
         vb, kl_mur, kl_pi = self.calc_vb()
         self.vbs[i] = vb
-        logstr = (
-            'const:%f, KL[MuR]: %f, KL[Pi]:%f vb: %f <- %f(prev vb)' %
-            (self.qs.const, kl_mur, kl_pi, vb, self.vbs[i - 1]))
+        logstr = ('const:%f, KL[MuR]: %f, KL[Pi]:%f vb: %f <- %f(prev vb)' %
+                  (self.qs.const, kl_mur, kl_pi, vb, self.vbs[i - 1]))
         logger.debug(logstr)
         if not self.check_vb_increase(self.vbs, i):
             logger.error('vb increased')
@@ -652,13 +652,13 @@ class Gmm(CheckTools):
         return was_loaded
 
 
-def plotter(y, s, gmm, figno=1):
+def plotter(y, s, gmm, title, figno=1):
     daat_dim, data_len = y.shape
     _, _, prm = gmm.get_samples(data_len)
     vbs = gmm.vbs
     # --- sample
     if False:
-        _plotter_core(y, s, prm, vbs, 'sample', 100 * figno + 1)
+        _plotter_core(y, s, prm, vbs, 'sample', title, 100 * figno + 1)
     # --- expectation
     if True:
         prm = [
@@ -666,10 +666,10 @@ def plotter(y, s, gmm, figno=1):
             gmm.theta.qmur.post.expt_prec,
             gmm.theta.qpi.post.expt,
         ]
-        _plotter_core(y, s, prm, vbs, 'expextation', 100 * figno + 2)
+        _plotter_core(y, s, prm, vbs, 'expextation', title, 100 * figno + 2)
 
 
-def _plotter_core(y, s, prms, vbs, prm_type_str, figno):
+def _plotter_core(y, s, prms, vbs, prm_type_str, sup_title, figno):
     from util.plot_models import PlotModels
     mu, r, pi = prms
     n_cols = 3
@@ -686,6 +686,7 @@ def _plotter_core(y, s, prms, vbs, prm_type_str, figno):
     pm.plot_2d_array((1, 1), y, title='Y')
     pm.plot_vb((1, 2), vbs, cspan=1)
     pm.plot_seq((2, 0), y, cat=s, title='Y', cspan=n_cols)
+    pm.sup_title(sup_title)
     pm.tight_layout()
 
 
@@ -699,37 +700,39 @@ def gen_data(data_dim, n_states, data_len):
     gmm.set_params({'MuR': {'mu': mu, 'W': W}})
     y, s, _ = gmm.get_samples(data_len)
     # --- plotter
-    plotter(y, s, gmm, 1)
+    plotter(y, s, gmm, 'data', 1)
     return y
 
 
 def update(y, n_states):
+    from numpy.random import randn
     data_dim, data_len = y.shape
     # --- setting
-    gmm = Gmm(data_dim, n_states, expt_init_mode='random')
-    mu = zeros((data_dim, n_states))
+    uo = ['M', 'E']
+    # gmm = Gmm(data_dim, n_states, expt_init_mode='random')
+    gmm = Gmm(data_dim, n_states, expt_init_mode='random', update_order=uo)
+    mu = randn(data_dim, n_states) * 10
     gmm.set_params({'MuR': {'mu': mu}})
-    gmm.init_expt_s(data_len)
+    gmm.init_expt_s(data_len, y)
     # --- plotter
     s = gmm.expt_s.argmax(0)
-    plotter(y, s, gmm, 2)
+    plotter(y, s, gmm, 'prior', 2)
     # --- update
     gmm.update(y)
     # --- plotter
     s = gmm.expt_s.argmax(0)
-    plotter(y, s, gmm, 3)
+    plotter(y, s, gmm, 'posterior', 3)
 
 
 def main():
     from matplotlib import pyplot as plt
-    data_dim = 2
-    n_states = 3
+    data_dim = 3
+    n_states = 4
     data_len = 2000
     y = gen_data(data_dim, n_states, data_len)
     update(y, n_states)
-    plt.pause(1)
-    from IPython import embed
-    embed()
+    plt.show()
+    input('return to finish')
 
 
 if __name__ == '__main__':

@@ -110,9 +110,9 @@ class qZS(FaZ):
         # --- expectations
         self.set_expt(self.s.expt, self.z_mu, self.z_cov)
 
-    def get_samples(self, data_len, pi=None, by_posterior=True):
+    def samples(self, data_len, pi=None, by_posterior=True):
         '''
-        zs.get_samples(data_len, pi=None, by_postrior=True)
+        zs.samples(data_len, pi=None, by_postrior=True)
         @argvs
         data_len: data length
         pi: array(n_states), probability, sum must be 1
@@ -122,7 +122,7 @@ class qZS(FaZ):
         s: array(n_states, data_len)
         '''
         # --- sample S
-        s = self.s.get_samples(data_len, pi)
+        s = self.s.samples(data_len, pi)
         # --- sample Z
         if by_posterior:
             z = ones((self.aug_dim, self.n_states, data_len)) * nan
@@ -215,7 +215,7 @@ class qLamb(FaLamb):
         mu = einsum('ijdk,jdk->idk', cov, pm_rysz)
         self.post.set_params(mu=mu, cov=cov, prc=prc)
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         if by_posterior:
             m = self.post.sample(data_len)
         else:
@@ -259,7 +259,7 @@ class qR(FaR):
         b = self.prior.b + 0.5 * (sum_yys - 2.0 * yszl + tr_szzll)
         self.post.set_params(a=a, b=b)
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         if by_posterior:
             r = self.post.sample(data_len)
         else:
@@ -382,10 +382,10 @@ class Theta(object):
         }
         return dst
 
-    def get_samples(self, data_len=1, by_posterior=True):
-        l = self.lamb.get_samples(data_len, by_posterior)
-        r = self.r.get_samples(data_len, by_posterior)
-        pi = self.pi.get_samples(data_len, by_posterior)
+    def samples(self, data_len=1, by_posterior=True):
+        l = self.lamb.samples(data_len, by_posterior)
+        r = self.r.samples(data_len, by_posterior)
+        pi = self.pi.samples(data_len, by_posterior)
         return l, r, pi
 
 
@@ -495,9 +495,9 @@ class Mfa:
             logger.error('%s' % e)
         return ret
 
-    def get_samples(self, data_len, by_posterior=True):
-        lamb, r, pi = self.theta.get_samples(by_posterior=by_posterior)
-        z, s = self.zs.get_samples(data_len, pi, by_posterior)
+    def samples(self, data_len, by_posterior=True):
+        lamb, r, pi = self.theta.samples(by_posterior=by_posterior)
+        z, s = self.zs.samples(data_len, pi, by_posterior)
         y = ones((self.data_dim, data_len)) * nan
         inv_r = inv(r.transpose(2, 0, 1)).transpose(1, 2, 0)
         for t in range(data_len):
@@ -548,13 +548,13 @@ def main():
     mfa = Mfa(fa_dim, data_dim, n_states)
     mfa.set_default_params()
     mfa.init_zs(data_len)
-    Y, Z, S, prms = mfa.get_samples(data_len)
+    Y, Z, S, prms = mfa.samples(data_len)
     plotter(Y, Z, S, prms, 'prior sample', 1)
     # --- update
     mfa = Mfa(fa_dim, data_dim, n_states)
     mfa.set_default_params()
     mfa.update(Y)
-    Y, Z, S, prms = mfa.get_samples(data_len)
+    Y, Z, S, prms = mfa.samples(data_len)
     plotter(Y, Z, S, prms, 'posterior sample', 2)
     plt.show()
 

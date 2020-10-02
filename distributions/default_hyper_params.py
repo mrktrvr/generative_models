@@ -11,6 +11,7 @@ from numpy import ones
 from numpy import zeros
 from numpy import tile
 from numpy.random import randn
+from numpy.random import rand
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 lib_root = os.path.join(cdir, '..')
@@ -47,7 +48,7 @@ class MultivariateNormalParams(object):
         self.cov = tile(e, (self.n_states, 1, 1)).transpose(1, 2, 0) * c
 
 
-class ParamNormalWishart(object):
+class NormalWishartParams(object):
     def __init__(self, data_dim, n_states):
         '''
         @argvs
@@ -72,18 +73,19 @@ class ParamNormalWishart(object):
         self._gen_W()
 
     def _gen_mu(self):
-        self.mu = zeros((self.data_dim, self.n_states))
+        # self.mu = zeros((self.data_dim, self.n_states))
         # self.mu = randn(self.data_dim, self.n_states)
+        self.mu = 1.0 * (randn(self.data_dim, self.n_states) - 0.5)
 
     def _gen_beta(self):
-        self.beta = ones(self.n_states) * 1e+0
+        self.beta = ones(self.n_states)
 
-    def _gen_W(self, c=1e-1, by_eye=True):
+    def _gen_W(self, c=1e-5, by_eye=True):
         from util.calc_util import rand_wishart
         self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
 
     def _gen_nu(self):
-        self.nu = ones((self.n_states)) * self.data_dim * 1e+1
+        self.nu = ones((self.n_states)) * self.data_dim * 1e-2
 
 
 class ParamDirichlet(object):
@@ -116,7 +118,7 @@ class ParamGamma(object):
 def main_multivariate_normal():
     data_dim = 4
     n_states = 3
-    prm_mvn = ParamMultivariateNormal(data_dim, n_states)
+    prm_mvn = MultivariateNormalParams(data_dim, n_states)
     print(prm_mvn.mu.shape)
     print(prm_mvn.mu)
     print(prm_mvn.cov.shape)
@@ -125,7 +127,7 @@ def main_multivariate_normal():
 def main_normal_wishart():
     data_dim = 4
     n_states = 3
-    prm_nw = ParamNormalWishart(data_dim, n_states)
+    prm_nw = NormalWishartParams(data_dim, n_states)
     print(prm_nw.mu.shape)
     print(prm_nw.beta.shape)
     print(prm_nw.nu.shape)
