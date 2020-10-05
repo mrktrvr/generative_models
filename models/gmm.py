@@ -440,11 +440,12 @@ class qS(object):
         n_states: number of states
         '''
         self.n_states = n_states
+        self._expt_init_mode = argvs.get('expt_init_mode', 'random')
         self.expt = None
         self.const = 0
         self._eps = 1e-10
 
-    def init_expt(self, data_len, obs=None, mode='random'):
+    def init_expt(self, data_len, obs=None):
         '''
         qS.init_expt(data_len, argvs)
         @argvs
@@ -453,7 +454,7 @@ class qS(object):
         expt: (n_states, data_lem)
         '''
         from model_util import init_expt
-        expt = init_expt(data_len, self.n_states, obs, mode)
+        expt = init_expt(data_len, self.n_states, obs, self._expt_init_mode)
         self.set_expt(expt)
 
     def set_expt(self, expt):
@@ -522,13 +523,14 @@ class Gmm(CheckTools):
         '''
         self.data_dim = data_dim
         self.n_states = n_states
+        self._expt_init_mode = argvs.get('expt_init_mode', 'random')
         # --- classes
         self.theta = Theta(data_dim, n_states)
-        self.qs = qS(n_states)
+        self.qs = qS(n_states, expt_init_mode=self._expt_init_mode)
         self.expt_s = self.qs.expt
         # --- learning params
         self.update_order = argvs.get('update_order', ['E', 'M'])
-        self.max_em_itr = argvs.get('max_em_itr', 100)
+        self.max_em_itr = argvs.get('max_em_itr', 20)
         self._expt_init_mode = argvs.get('expt_init_mode', 'random')
         # --- variational bounds
         self.vbs = ones(self.max_em_itr) * nan
@@ -555,12 +557,15 @@ class Gmm(CheckTools):
         self.theta.set_params(prm)
         self.data_dim = self.theta.data_dim
 
-    def init_expt_s(self, data_len, obs=None, mode='kmeans'):
+    def init_expt_s(self, data_len, obs=None):
         '''
-        gmm.init_expt_s(data_len, obs=None, mode='random')
+        gmm.init_expt_s(data_len, obs=None)
         '''
         if self.qs.expt is None:
-            self.qs.init_expt(data_len, obs, mode)
+            self.qs.init_expt(
+                data_len,
+                obs,
+            )
             self.expt_s = self.qs.expt
 
     def set_expt_s(self, expt):
@@ -577,6 +582,7 @@ class Gmm(CheckTools):
         @argv:
         Y: observation data, np.array(data_dim, data_len)
         '''
+        logger.info('update order: %s' % self.update_order)
         self.data_dim, data_len = Y.shape
         self.init_expt_s(data_len)
         for i in range(self.max_em_itr):
@@ -675,28 +681,39 @@ def _plotter_core(y, s, prms, vbs, prm_type_str, sup_title, figno):
     n_cols = 3
     pm = PlotModels(3, n_cols, figno)
     idx1, idx2 = 0, 1
-    # --- params
-    pm.plot_2d_array((0, 0), mu, title=r'$\mu$ %s' % prm_type_str)
-    pm.multi_bar((0, 1), atleast_2d(pi), title=r'$\pi$ %s' % prm_type_str)
-    # cov = inv(r.transpose(2, 0, 1)).transpose(1, 2, 0)
-    # pm.plot_2d_mu_cov((0, 2), mu, cov, src=y, cat=s)
-    # --- Y
+    # --- Pi
+    pm.multi_bar((0, 0), atleast_2d(pi), title=r'$\pi$ %s' % prm_type_str)
+    # --- mu
+    pm.plot_2d_array((0, 1), mu, title=r'$\mu$ %s' % prm_type_str)
+    # --- mu with cov
+    cov = inv(r.transpose(2, 0, 1)).transpose(1, 2, 0)
+    pm.plot_2d_mu_cov((0, 2), mu, cov, src=y, cat=s)
+    # --- Y (Scatter 2D)
     title = 'Scatter Dim %d v %d' % (idx1, idx2)
     pm.plot_2d_scatter((1, 0), y, mu, cat=s, idx1=idx1, idx2=idx2, title=title)
+    # --- Y (data_dim v amplitude)
     pm.plot_2d_array((1, 1), y, title='Y')
+    # --- Variational bound
     pm.plot_vb((1, 2), vbs, cspan=1)
+    # --- Y (sequence)
     pm.plot_seq((2, 0), y, cat=s, title='Y', cspan=n_cols)
+    # ---
     pm.sup_title(sup_title)
     pm.tight_layout()
 
 
 def gen_data(data_dim, n_states, data_len):
     from util.calc_util import rand_wishart
-    from numpy.random import randn
     gmm = Gmm(data_dim, n_states, expt_init_mode='random')
     gmm.set_default_params()
-    mu = randn(data_dim, n_states) * 10
-    W = rand_wishart(data_dim, n_states, c=1, by_eye=True)
+    if False:
+        from numpy.random import randn
+        mu = randn(data_dim, n_states) * 2
+    else:
+        from numpy import linspace
+        mu = linspace(-1, 1, data_dim * n_states) * 2
+        mu = mu.reshape(n_states, data_dim).T
+    W = rand_wishart(data_dim, n_states, c=1e+3, by_eye=True)
     gmm.set_params({'MuR': {'mu': mu, 'W': W}})
     y, s, _ = gmm.get_samples(data_len)
     # --- plotter
@@ -710,8 +727,9 @@ def update(y, n_states):
     # --- setting
     uo = ['M', 'E']
     # gmm = Gmm(data_dim, n_states, expt_init_mode='random')
-    gmm = Gmm(data_dim, n_states, expt_init_mode='random', update_order=uo)
-    mu = randn(data_dim, n_states) * 10
+    # gmm = Gmm(data_dim, n_states, expt_init_mode='random', update_order=uo)
+    gmm = Gmm(data_dim, n_states, expt_init_mode='kmeans', update_order=uo)
+    mu = randn(data_dim, n_states) * 2
     gmm.set_params({'MuR': {'mu': mu}})
     gmm.init_expt_s(data_len, y)
     # --- plotter
@@ -726,11 +744,12 @@ def update(y, n_states):
 
 def main():
     from matplotlib import pyplot as plt
-    data_dim = 3
+    data_dim = 2
     n_states = 4
     data_len = 2000
     y = gen_data(data_dim, n_states, data_len)
     update(y, n_states)
+    plt.ion()
     plt.show()
     input('return to finish')
 

@@ -47,6 +47,9 @@ class CheckTools(object):
 
 
 def init_expt(data_len, n_states, obs=None, mode='random'):
+    '''
+    mode: random or kmeans
+    '''
     alpha_pi = ones(n_states)
     expt = dirichlet(alpha_pi, size=data_len).T
     if mode == 'kmeans' and obs is not None:

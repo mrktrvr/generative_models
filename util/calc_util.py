@@ -59,7 +59,7 @@ def logdet(src):
             logger.error('dim %d is not supprted.' % src.ndim)
     except Exception as e:
         from numpy.linalg import slogdet
-        logger.info(e)
+        logger.info('%s. shape=%s' % (e, list(src.shape)))
         ldt, sgn = slogdet(src)
         dst = sgn * ldt
     return dst

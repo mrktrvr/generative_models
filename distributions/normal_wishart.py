@@ -186,7 +186,7 @@ class NormalWishart(object):
         if R is None:
             R = self.sample_R()[0]
         mu = zeros((data_len, self.data_dim, self.n_states))
-        for k in xrange(self.n_states):
+        for k in range(self.n_states):
             # cov = inv(self.beta[k] * R[:, :, k])
             cov = inv(R[:, :, k])
             try:
@@ -204,14 +204,15 @@ class NormalWishart(object):
         R: (data_len, data_dim, data_dim, n_states)
         '''
         R = zeros((data_len, self.data_dim, self.data_dim, self.n_states))
-        for k in xrange(self.n_states):
+        for k in range(self.n_states):
             nu = self.nu[k]
             W = self.W[:, :, k]
             try:
                 R[:, :, :, k] = wishart.rvs(nu, W, size=data_len)
-            except:
+            except Exception as exception:
                 R[:, :, :, k] = tile((nu * W), (data_len, 1, 1))
-                logger.warn('whshart.rvs failed set expectations instead')
+                logger.warn('whshart.rvs failed set expectations instead. (%s)'
+                            % exception)
         return R
 
     def sample_mu_R(self, data_len=1):

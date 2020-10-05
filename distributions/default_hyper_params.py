@@ -80,12 +80,16 @@ class NormalWishartParams(object):
     def _gen_beta(self):
         self.beta = ones(self.n_states)
 
-    def _gen_W(self, c=1e-5, by_eye=True):
-        from util.calc_util import rand_wishart
-        self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
+    def _gen_W(self, c=1e-1, by_eye=True):
+        if False:
+            from util.calc_util import rand_wishart
+            self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
+        else:
+            tmp = tile(eye(self.data_dim), (self.n_states, 1, 1))
+            self.W = tmp.transpose(1, 2, 0)
 
     def _gen_nu(self):
-        self.nu = ones((self.n_states)) * self.data_dim * 1e-2
+        self.nu = ones((self.n_states)) * self.data_dim
 
 
 class ParamDirichlet(object):

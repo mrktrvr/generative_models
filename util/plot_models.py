@@ -254,8 +254,8 @@ class PlotModels():
         # --- width and height
         v = 2.0 * sqrt(2.0) * sqrt(eig_v)
         w, h = v[idx1], v[idx2]
-        h *= 1e+1
-        w *= 1e+1
+        h *= 1e+0
+        w *= 1e+0
         m = mu[idx]
         return m, w, h, deg
 
@@ -346,6 +346,7 @@ class PlotModels():
         ymin = args.get('ymin', None)
         xlbl = args.get('xlbl', '')
         ylbl = args.get('ylbl', '')
+        baseline = args.get('baseline', 'sym')
         ymin = src.min() if ymin is None else ymin
         ymax = nanmax(abs(src))
         src = atleast_2d(src)
@@ -367,8 +368,10 @@ class PlotModels():
                     for k in range(n_states)] if lbls is None else lbls
             clr = StateColor(n_states).get_color_list()
             y *= ymax
+            if baseline != 'zero':
+                y *= 2
             self.ax.stackplot(
-                pltx, y, colors=clr, alpha=0.5, labels=lbls, baseline='zero')
+                pltx, y, colors=clr, alpha=0.5, labels=lbls, baseline=baseline)
         xlim = (pltx[0], pltx[-1])
         ylim = (ymin, ymax)
         self._decos_xticks(pltx)
@@ -508,6 +511,7 @@ class PlotModels():
         fmt = args.get('fmt', '%8.2f')
         cspan = args.get('cspan', 1)
         rspan = args.get('rspan', 1)
+        title = args.get('title', '')
         self.ax = self.get_ax(pos, rspan=rspan, cspan=cspan)
         ndim = src.ndim
         n_states = src.shape[0]
@@ -533,6 +537,7 @@ class PlotModels():
             loc='center',
             cellLoc='center',
             colLoc='center')
+        self.ax.set_title(title, fontsize=self.f_size)
         self.ax.set_axis_off()
 
     def plot_vb(self, pos, vbs, **args):
