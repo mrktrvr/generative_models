@@ -57,8 +57,8 @@ def calc_tf_idf(s_list, n_states):
     tf: np.array(n_states, len(s_list))
     idf: np.array(n_states)
     '''
-    n_state_in_batch = arr([[len(s[s == k]) for k in range(n_states)]
-                            for s in s_list])
+    n_state_in_batch = arr(
+        [[len(s[s == k]) for k in range(n_states)] for s in s_list])
     n_in_batch = arr([len(s) for s in s_list], dtype=float)
     tf = n_state_in_batch / n_in_batch[:, newaxis]
     tf = tf.T
@@ -77,6 +77,7 @@ class qPi(object):
     '''
     qpi = qPi(n_states, n_cat)
     '''
+
     def __init__(self, n_states, n_cat):
         '''
         qpi = qPi(n_states, n_cat)
@@ -134,9 +135,9 @@ class qPi(object):
         alpha_h = self.prior.alpha + sum_sz
         self.post.set_params(alpha=alpha_h)
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         '''
-        qpi.get_samples(data_len=1, by_posterior=True)
+        qpi.samples(data_len=1, by_posterior=True)
         @argvs
         data_len: int
         by_posterior: sample from posterior(True) or prior(False)
@@ -149,18 +150,18 @@ class qPi(object):
             alpha = self.prior.sample(data_len)
         return alpha
 
-    def get_param_dict(self, by_posterior=True):
+    def get_params(self, by_posterior=True):
         '''
-        phi.get_param_dict(by_posterior=True)
+        phi.get_params(by_posterior=True)
         @argvs
         by_posterior: parameters of posterior(True) or prior(False)
         @return
         dst: {'alpha': np.array(n_cat), 'ln_alpha': np.array(n_cat)}
         '''
         if by_posterior:
-            dst = self.post.get_param_dict()
+            dst = self.post.get_params()
         else:
-            dst = self.prior.get_param_dict()
+            dst = self.prior.get_params()
         return dst
 
 
@@ -193,6 +194,7 @@ class qZ(gmm_qs):
     '''
     qz = qZ(n_cat)
     '''
+
     def __init__(self, n_cat):
         '''
         qz = qz(n_cat)
@@ -237,9 +239,9 @@ class qZ(gmm_qs):
         expt = dirichlet(alpha_pi, size=data_len).T
         self.set_expt(expt)
 
-    def get_samples(self, data_len, phi):
+    def samples(self, data_len, phi):
         '''
-        qz.get_samples(data_len , phi)
+        qz.samples(data_len , phi)
         @argvs
         data_len: int
         phi: np.array(n_cat)
@@ -261,6 +263,7 @@ class qZ(gmm_qs):
 class Lda(CheckTools):
     '''
     '''
+
     def __init__(self, n_states, n_cat, **argvs):
         '''
         n_states: number of states, int
@@ -380,18 +383,18 @@ class Lda(CheckTools):
                 else:
                     raise Exception('update order %s does not exist' % uo)
 
-    def get_samples(self, data_len_list, by_posterior=True):
+    def samples(self, data_len_list, by_posterior=True):
         '''
-        lda.get_samples(data_len_list, by_posterior=True)
+        lda.samples(data_len_list, by_posterior=True)
         '''
         s = []
         z = []
         phi = []
         self.init_qphi_qz(len(data_len_list))
-        pi = self.qpi.get_samples(1, by_posterior)
+        pi = self.qpi.samples(1, by_posterior)
         for b, dl in enumerate(data_len_list):
-            phi_b = self.qphi_list[b].get_samples(1, by_posterior)
-            z_b = self.qz_list[b].get_samples(dl, phi_b)
+            phi_b = self.qphi_list[b].samples(1, by_posterior)
+            z_b = self.qz_list[b].samples(dl, phi_b)
             s_b = zeros(dl, dtype=int)
             for t in range(dl):
                 s_b[t] = choice(self.n_states, p=pi[:, z_b[t]])
@@ -407,9 +410,9 @@ class Lda(CheckTools):
         pi_expt = self.qpi.post.expt
         return z_expt, phi_expt, pi_expt
 
-    def get_param_dict(self, by_posterior=True):
+    def get_params(self, by_posterior=True):
         '''
-        theta.get_param_dict(by_posterior=True)
+        theta.get_params(by_posterior=True)
         @argvs
         by_posterior: use posterior params(True) or not(False)
         @return
@@ -424,21 +427,22 @@ class Lda(CheckTools):
         }
         '''
         dst = {
-            'Pi': self.qpi.get_param_dict(by_posterior),
-            'Phi': [x.get_param_dict() for x in self.qphi_list]
+            'Pi': self.qpi.get_params(by_posterior),
+            'Phi': [x.get_params() for x in self.qphi_list]
         }
         return dst
 
-    def save_param_dict(self, file_name, by_posterior=True):
-        prm = self.get_param_dict(by_posterior)
+    def save_params(self, file_name, by_posterior=True):
+        prm = self.get_params(by_posterior)
         try:
             with open(file_name, 'w') as f:
                 pickle.dump(prm, f)
             return True
-        except:
+        except Exception as exception:
+            logger.error(exception)
             return False
 
-    def load_param_dict(self, file_name):
+    def load_params(self, file_name):
         if os.path.exists(file_name):
             with open(file_name, 'r') as f:
                 prm = pickle.load(f)
@@ -448,12 +452,12 @@ class Lda(CheckTools):
             return False
 
 
-def plotter(s_list, z_list, prms, figno, msg):
+def plotter(s_list, z_list, prms, figtitle, msg):
     from util.plot_models import PlotModels
-    logger.info('plotting %s %s' % (str(figno), msg))
+    logger.info('plotting %s %s' % (str(figtitle), msg))
     pi = prms[0]
     phi = arr(prms[1])
-    pm = PlotModels(4, 2, figno)
+    pm = PlotModels(4, 2, figtitle)
     pm.multi_bar((0, 0), pi, title=r'$\pi$', xlbl='cat each state')
     pm.multi_bar((0, 1), phi, title=r'$\phi$', xlbl='cat each batch')
     n_states, n_cat = pi.shape
@@ -479,6 +483,8 @@ def plotter(s_list, z_list, prms, figno, msg):
     phi_seq = concatenate(tmp, 1)
     pm.plot_states_stack((3, 0), phi_seq, title='Phi', cspan=1)
     pm.plot_states_indv((3, 1), phi_seq, title='Phi', cspan=1)
+    pm.sup_title('%s %s' % (str(figtitle), msg))
+    pm.tight_layout()
 
 
 def gen_data(n_batches=32, n_states=8, n_cat=4, do_plot=True, do_print=False):
@@ -504,7 +510,7 @@ def gen_data(n_batches=32, n_states=8, n_cat=4, do_plot=True, do_print=False):
     lda = Lda(n_states, n_cat)
     lda.set_default_params(n_batches)
     lda.set_params(prms)
-    s_list, z_list, prms = lda.get_samples(data_len_list)
+    s_list, z_list, prms = lda.samples(data_len_list)
     if do_print:
         print('s')
         for b in range(n_batches):
@@ -528,14 +534,16 @@ def main():
     lda.set_default_params(n_batches)
     lda.init_expt_z(data_len_list)
     # --- prior sample
-    _, z_list_pri, prms_pri = lda.get_samples(data_len_list)
+    _, z_list_pri, prms_pri = lda.samples(data_len_list)
     plotter(s_list, z_list_pri, prms_pri, '00_init', 'before')
     # --- update
     lda.update(s_list)
     # --- posterior sample
-    _, z_list_pst, prms_pst = lda.get_samples(data_len_list)
+    _, z_list_pst, prms_pst = lda.samples(data_len_list)
     plotter(s_list, z_list_pst, prms_pst, '02_estimate', 'after')
+    plt.ion()
     plt.show()
+    input('Return to finish')
 
 
 if __name__ == '__main__':
