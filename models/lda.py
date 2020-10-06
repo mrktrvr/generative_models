@@ -31,8 +31,8 @@ cdir = os.path.abspath(os.path.dirname(__file__))
 
 sys.path.append(os.path.join(cdir, '..'))
 from distributions.dirichlet import Dirichlet
-from util.calc_util import logsumexp
-from util.logger import logger
+from utils.calc_utils import logsumexp
+from utils.logger import logger
 
 
 def idx_seq_to_full_array(src, n_states):
@@ -272,7 +272,6 @@ class Lda(CheckTools):
         '''
         self.n_states = n_states
         self.n_cat = n_cat
-        self.max_em_itr = argvs.get('max_em_itr', 50)
         self.tfidf = argvs.get('tfidf', None)
         # --- distributions
         self.qpi = qPi(n_states, n_cat)
@@ -338,14 +337,14 @@ class Lda(CheckTools):
             print('qpi.prior(n_states x n_cat)\n', self.qpi.prior.expt.T)
         print('---')
 
-    def update(self, s_list):
+    def update(self, s_list, max_em_itr):
         '''
         lda.update(s_list)
         s_list: list of np.array(n_states, data_len)
         '''
-        self.update_lda(s_list)
+        self.update_lda(s_list, max_em_itr)
 
-    def update_lda(self, s_list):
+    def update_lda(self, s_list, max_em_itr):
         '''
         lda.update(s_list)
         s_list: list of np.array(n_states, data_len) or np.array(data_len)
@@ -353,14 +352,12 @@ class Lda(CheckTools):
         n_batches = len(s_list)
         self.init_qphi_qz(n_batches)
         # self._print_params(-1)
-        self._update_core(s_list, self.update_order_lda, self.max_em_itr)
+        self._update_core(s_list, self.update_order_lda, max_em_itr)
 
     def predict(self, s_list, n_itr=1):
         n_batches = len(s_list)
         self.init_qphi_qz(n_batches)
-        # update_order = self.update_order_lda
         update_order = ['Z', 'Phi', 'Pi']
-        # update_order = ['Z', 'Phi']
         self._update_core(s_list, update_order, n_itr)
 
     def _update_core(self, s_list, update_order, n_itr):
@@ -453,7 +450,7 @@ class Lda(CheckTools):
 
 
 def plotter(s_list, z_list, prms, figtitle, msg):
-    from util.plot_models import PlotModels
+    from helpers.plot_models import PlotModels
     logger.info('plotting %s %s' % (str(figtitle), msg))
     pi = prms[0]
     phi = arr(prms[1])
@@ -537,7 +534,7 @@ def main():
     _, z_list_pri, prms_pri = lda.samples(data_len_list)
     plotter(s_list, z_list_pri, prms_pri, '00_init', 'before')
     # --- update
-    lda.update(s_list)
+    lda.update(s_list, 100)
     # --- posterior sample
     _, z_list_pst, prms_pst = lda.samples(data_len_list)
     plotter(s_list, z_list_pst, prms_pst, '02_estimate', 'after')

@@ -17,7 +17,7 @@ CDIR = os.path.abspath(os.path.dirname(__file__))
 
 LIB_ROOT = os.path.join(CDIR, '..')
 sys.path.append(LIB_ROOT)
-from util.logger import logger
+from utils.logger import logger
 
 
 class CheckTools(object):

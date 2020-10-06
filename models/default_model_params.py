@@ -16,7 +16,7 @@ from numpy.random import randn
 
 CDIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(CDIR, '..'))
-from util.calc_util import inv
+from utils.calc_utils import inv
 
 
 class DefaultFaParams(object):

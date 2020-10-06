@@ -19,9 +19,9 @@ CDIR = os.path.abspath(os.path.dirname(__file__))
 LIB_ROOT = os.path.join(CDIR, '..')
 sys.path.append(LIB_ROOT)
 from distributions.default_hyper_params import MultivariateNormalParams
-from util.calc_util import inv
-from util.calc_util import calc_lndet
-from util.logger import logger
+from utils.calc_utils import inv
+from utils.calc_utils import calc_lndet
+from utils.logger import logger
 
 
 class MultivariateNormal(object):

@@ -28,8 +28,8 @@ from default_model_params import DefaultFaParams
 LIB_ROOT = os.path.join(CDIR, '..')
 sys.path.append(LIB_ROOT)
 
-from util.logger import logger
-from util.calc_util import inv
+from utils.logger import logger
+from utils.calc_utils import inv
 from distributions.multivariate_normal import MultivariateNormal
 from distributions.gamma import Gamma
 
@@ -537,7 +537,7 @@ class Fa(object):
 
 def plotter(y, z, prms, title, figno=1):
     from numpy import diag
-    from util.plot_models import PlotModels
+    from helpers.plot_models import PlotModels
     l, r, inv_r = prms
     pm = PlotModels(3, 3, figno)
     pm.plot_2d_array((0, 0), l[:-1, :, 0].T, title='$\Lambda$[:-1]')

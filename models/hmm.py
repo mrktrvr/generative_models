@@ -25,8 +25,8 @@ cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
 from distributions.dirichlet import Dirichlet
 from distributions.kl_divergence import KL_Dir
-from util.calc_util import inv
-from util.logger import logger
+from utils.calc_utils import inv
+from utils.logger import logger
 from model_util import init_expt
 
 
@@ -575,7 +575,7 @@ def plotter(y, s, hmm, sup_title, figno):
 
 
 def _plotter_core(y, s, prm, vbs, prm_type_str, sup_title, figno):
-    from util.plot_models import PlotModels
+    from helpers.plot_models import PlotModels
     mu, r, pi, A = prm
     n_cols = 3
     pm = PlotModels(3, n_cols, figno)
@@ -600,7 +600,7 @@ def _plotter_core(y, s, prm, vbs, prm_type_str, sup_title, figno):
 
 
 def gen_data(data_dim, n_states, data_len):
-    from util.calc_util import rand_wishart
+    from helpers.calc_util import rand_wishart
     from numpy.random import seed
     seed(1)
     hmm = Hmm(data_dim, n_states, expt_init_mode='random')

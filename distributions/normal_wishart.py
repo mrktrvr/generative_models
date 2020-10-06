@@ -20,9 +20,9 @@ from .default_hyper_params import NormalWishartParams
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import inv
-from util.calc_util import logdet
-from util.logger import logger
+from utils.calc_utils import inv
+from utils.calc_utils import logdet
+from utils.logger import logger
 
 
 class NormalWishart(object):

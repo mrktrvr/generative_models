@@ -28,10 +28,10 @@ from fa import qR as FaR
 cdir = os.path.abspath(os.path.dirname(__file__))
 lib_root = os.path.join(cdir, '..')
 sys.path.append(lib_root)
-from util.logger import logger
-from util.calc_util import inv
-from util.calc_util import logdet
-from util.calc_util import logsumexp
+from utils.logger import logger
+from utils.calc_utils import inv
+from utils.calc_utils import logdet
+from utils.calc_utils import logsumexp
 
 
 class qZS(FaZ):
@@ -510,7 +510,7 @@ class Mfa:
 def plotter(y, z, s, prms, title, figno):
     from numpy import diag
     from numpy import array as arr
-    from util.plot_models import PlotModels
+    from helpers.plot_models import PlotModels
     l, r, inv_r, pi = prms
     aug_dim, dat_dim, n_states = l.shape
     n_cols = aug_dim + 1

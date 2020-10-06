@@ -8,10 +8,8 @@ import sys
 
 from numpy import eye
 from numpy import ones
-from numpy import zeros
 from numpy import tile
 from numpy.random import randn
-from numpy.random import rand
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 lib_root = os.path.join(cdir, '..')
@@ -82,7 +80,7 @@ class NormalWishartParams(object):
 
     def _gen_W(self, c=1e-1, by_eye=True):
         if False:
-            from util.calc_util import rand_wishart
+            from utils.calc_utils import rand_wishart
             self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
         else:
             tmp = tile(eye(self.data_dim), (self.n_states, 1, 1))

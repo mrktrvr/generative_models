@@ -18,14 +18,15 @@ from .default_hyper_params import ParamDirichlet
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import logsumexp
-from util.logger import logger
+from utils.calc_utils import logsumexp
+from utils.logger import logger
 
 
 class Dirichlet(object):
     '''
     Dirichlet()
     '''
+
     def __init__(self, n_states, len_2d=0, do_set_prm=False):
         '''
         n_states: number of states
@@ -172,13 +173,14 @@ class Dirichlet(object):
             colw = ones(n_states) / float(n_states)
         else:
             logger.error('ndim %d not supported' % ndim)
-        plt.table(cellText=cell,
-                  rowLabels=rows,
-                  colLabels=cols,
-                  colWidths=colw,
-                  loc='center',
-                  cellLoc='center',
-                  colLoc='center')
+        plt.table(
+            cellText=cell,
+            rowLabels=rows,
+            colLabels=cols,
+            colWidths=colw,
+            loc='center',
+            cellLoc='center',
+            colLoc='center')
         plt.axis('off')
 
 

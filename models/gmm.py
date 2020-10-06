@@ -29,9 +29,9 @@ from distributions.dirichlet import Dirichlet
 from distributions.kl_divergence import KL_Norm_Wish
 from distributions.kl_divergence import KL_Dir
 from model_util import init_expt
-from util.calc_util import inv
-from util.calc_util import logsumexp
-from util.logger import logger
+from utils.calc_utils import inv
+from utils.calc_utils import logsumexp
+from utils.logger import logger
 
 
 class qMuR():
@@ -700,7 +700,7 @@ def plotter(y, s, gmm, title, figno=1):
 
 
 def _plotter_core(y, s, prms, vbs, prm_type_str, sup_title, figno):
-    from util.plot_models import PlotModels
+    from helpers.plot_models import PlotModels
     mu, r, pi = prms
     n_cols = 3
     pm = PlotModels(3, n_cols, figno)
@@ -725,7 +725,7 @@ def _plotter_core(y, s, prms, vbs, prm_type_str, sup_title, figno):
 
 
 def gen_data(data_dim, n_states, data_len):
-    from util.calc_util import rand_wishart
+    from helpers.calc_util import rand_wishart
     from numpy.random import seed
     seed(1)
     gmm = Gmm(data_dim, n_states, expt_init_mode='random')

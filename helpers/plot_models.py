@@ -28,9 +28,9 @@ from matplotlib import pyplot as plt
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.plot_util import StateColor
-from util.logger import logger
-from util.time_util import TimeUtil
+from utils.plot_utils import StateColor
+from utils.logger import logger
+from utils.time_utils import TimeUtil
 
 
 class PlotModelsGrid():

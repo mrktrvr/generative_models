@@ -8,13 +8,12 @@ from numpy import newaxis
 from numpy import arange
 from numpy import zeros
 from numpy import ones
-from numpy import tile
 from numpy import log
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import logmatprod
-from util.calc_util import logsumexp
+from utils.calc_utils import logmatprod
+from utils.calc_utils import logsumexp
 
 
 class ForwardBackward(object):
