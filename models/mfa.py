@@ -135,9 +135,9 @@ class qZS(FaZ):
                 z[:, k, t] = mvnrnd(self.z_mu[:, k, t], self.z_cov[:, :, k])
             t_rest = data_len - t_max
             if t_rest > 0:
-                z[:, :, t_max:] = self.prior.sample(t_rest).transpose(1, 2, 0)
+                z[:, :, t_max:] = self.prior.samples(t_rest).transpose(1, 2, 0)
         else:
-            z = self.prior.sample(data_len)[:, :, 0].T
+            z = self.prior.samples(data_len)[:, :, 0].T
         return z, s
 
 
@@ -217,9 +217,9 @@ class qLamb(FaLamb):
 
     def samples(self, data_len=1, by_posterior=True):
         if by_posterior:
-            m = self.post.sample(data_len)
+            m = self.post.samples(data_len)
         else:
-            m = self.prior.sample(data_len)
+            m = self.prior.samples(data_len)
         return m
 
 
@@ -261,9 +261,9 @@ class qR(FaR):
 
     def samples(self, data_len=1, by_posterior=True):
         if by_posterior:
-            r = self.post.sample(data_len)
+            r = self.post.samples(data_len)
         else:
-            r = self.prior.sample(data_len)
+            r = self.prior.samples(data_len)
         r = einsum('dk,de->dek', r, eye(self.data_dim))
         return r
 
@@ -402,15 +402,12 @@ class Mfa:
         self.fa_dim = fa_dim
         self.aug_dim = fa_dim + 1
         self.n_states = n_states
+        self.update_order = args.get('update_order', ['E', 'M'])
+        self._expt_init_mode = args.get('expt_init_mode', 'random')
+
         # --- theta and zs
         self.zs = qZS(fa_dim, n_states)
         self.theta = Theta(self.fa_dim, self.data_dim, self.n_states)
-        # --- update setting
-        self.max_itr = args.get('max_itr', 100)
-        self.update_order = [
-            'Theta',
-            'ZS',
-        ]
 
     def init_zs(self, data_len):
         self.zs.init_expt(data_len)
@@ -441,7 +438,7 @@ class Mfa:
         '''
         self.theta.set_params(prm)
 
-    def update(self, Y):
+    def update(self, Y, max_em_itr):
         '''
         mfa.update()
         @argvs
@@ -449,11 +446,13 @@ class Mfa:
         '''
         logger.info('update order %s, in Theta %s' % (self.update_order,
                                                       self.theta.update_order))
-        for i in range(self.max_itr):
+        ibgn = 0
+        iend = max_em_itr
+        for i in range(ibgn, iend):
             for j, uo in enumerate(self.update_order):
-                if uo == 'ZS':
+                if uo == 'E':
                     self.zs.update(Y, self.theta)
-                elif uo == 'Theta':
+                elif uo == 'M':
                     self.theta.update(Y, self.zs)
                 else:
                     logger.error('%s is not supported' % uo)
@@ -508,7 +507,7 @@ class Mfa:
         return y, z, s, [lamb, r, inv_r, pi]
 
 
-def plotter(y, z, s, prms, title, figno=1):
+def plotter(y, z, s, prms, title, figno):
     from numpy import diag
     from numpy import array as arr
     from util.plot_models import PlotModels
@@ -538,6 +537,28 @@ def plotter(y, z, s, prms, title, figno=1):
     pm.tight_layout()
 
 
+def gen_data(fa_dim, data_dim, data_len, n_states):
+    mfa = Mfa(fa_dim, data_dim, n_states)
+    mfa.set_default_params()
+    mfa.init_zs(data_len)
+    Y, Z, S, prms = mfa.samples(data_len)
+    plotter(Y, Z, S, prms, 'MFA Data', 1)
+    return Y
+
+
+def update(Y, fa_dim, n_states):
+    data_dim, data_len = Y.shape
+    mfa = Mfa(fa_dim, data_dim, n_states)
+    mfa.set_default_params()
+    # --- prior samples
+    Y, Z, S, prms = mfa.samples(data_len)
+    plotter(Y, Z, S, prms, 'MFA Prior', 2)
+    mfa.update(Y, 100)
+    # --- posterior samples
+    Y, Z, S, prms = mfa.samples(data_len)
+    plotter(Y, Z, S, prms, 'MFA posterior sample', 3)
+
+
 def main():
     from matplotlib import pyplot as plt
     fa_dim = 3
@@ -545,18 +566,13 @@ def main():
     n_states = 3
     data_len = 1000
     # --- data
-    mfa = Mfa(fa_dim, data_dim, n_states)
-    mfa.set_default_params()
-    mfa.init_zs(data_len)
-    Y, Z, S, prms = mfa.samples(data_len)
-    plotter(Y, Z, S, prms, 'prior sample', 1)
+    Y = gen_data(fa_dim, data_dim, data_len, n_states)
     # --- update
-    mfa = Mfa(fa_dim, data_dim, n_states)
-    mfa.set_default_params()
-    mfa.update(Y)
-    Y, Z, S, prms = mfa.samples(data_len)
-    plotter(Y, Z, S, prms, 'posterior sample', 2)
+    update(Y, fa_dim, n_states)
+    # ---
+    plt.ion()
     plt.show()
+    input('Return to finish')
 
 
 if __name__ == '__main__':

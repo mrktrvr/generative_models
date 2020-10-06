@@ -31,7 +31,7 @@ class MultivariateNormal(object):
     mvn = MultivaliateNormal(data_dim, n_states=1)
     mvn.set_params(mean=mu, cov=cov, prec=prec)
     prms = mvn.get_params()
-    smp = mvn.sample(data_len=1)
+    smp = mvn.samples(data_len=1)
     mvn.clear_params()
     '''
 
@@ -141,9 +141,9 @@ class MultivariateNormal(object):
         dst = {'mu': self.mu, 'cov': self.cov, 'prec': self.prec}
         return dst
 
-    def sample(self, data_len=1):
+    def samples(self, data_len=1):
         '''
-        mvn.sample(data_dim=1)
+        mvn.samples(data_dim=1)
 
         Argvs
         data_len: number of samples
@@ -188,6 +188,9 @@ class MultivariateNormal(object):
         if data_len == 1:
             dst = dst[0]
         return dst
+
+    def expectations(self):
+        return self.mu, self.expt_prec
 
     def _calc_inv(self, src):
         if src.ndim == 1:
@@ -323,7 +326,7 @@ if __name__ == '__main__':
     n_states = 3
     data_len = 100
     mvn = MultivariateNormal(data_dim, n_states, do_set_prm=True)
-    smp = mvn.sample(data_len)
+    smp = mvn.samples(data_len)
     print(mvn)
     print(smp.shape)
     print('\n'.join([

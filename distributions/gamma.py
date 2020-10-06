@@ -28,6 +28,7 @@ class Gamma:
     '''
     gd = Gamma(n_states)
     '''
+
     def __init__(self, n_states, data_dim=1, do_set_prm=False):
         '''
         keywords
@@ -124,7 +125,7 @@ class Gamma:
             ln_diag_expt = None
         return ln_diag_expt
 
-    def sample(self, data_len=1):
+    def samples(self, data_len=1):
         if self.a.ndim == 1:
             dst = gamrand(self.a, 1.0 / self.b)
         elif self.a.ndim == 2:
@@ -136,6 +137,9 @@ class Gamma:
             logger.error('ndim %d is not supported' % self.expt.ndim)
             dst = None
         return dst
+
+    def expectations(self):
+        return self.expt
 
     def __str__(self):
         res = '-' * 7
@@ -182,5 +186,4 @@ if __name__ == '__main__':
     a = ones((data_dim, n_states)) * 1e+3
     b = ones((data_dim, n_states))
     gd = Gamma(a=a, b=b)
-    print(gd)
     embed(header=__file__)

@@ -546,21 +546,28 @@ class PlotModels():
         from numpy import diff
         cspan = args.get('cspan', 1)
         rspan = args.get('rspan', 1)
-        len_vb = len(vbs)
         self.ax = self.get_ax(pos, rspan=rspan, cspan=cspan)
-        if not nany(isnan(vbs)):
+        if vbs is not None and not nany(isnan(vbs)):
+            len_vb = len(vbs)
             self.ax.plot(vbs, label='vbs')
             vb_df = diff(vbs)
-            for i, v in enumerate(vb_df, 1):
-                if v < 0:
-                    self.ax.plot(i, v, 'rx', label='%d' % i)
+            vb_df_neg_idx = arange(len(vb_df))[vb_df < 0] + 1
+            vb_negs = vbs[vb_df_neg_idx]
+            self.ax.plot(vb_df_neg_idx, vb_negs, 'rx', ms=10)
+            for i, v in zip(vb_df_neg_idx, vb_negs):
+                self.ax.text(i, v, '%d: %f' % (i, v), ha='right', va='top')
+            x, y = len_vb - 1, vbs[-1]
+            txt = 'Itr:%d,VB:%f' % (x, y)
+            self.ax.plot(x, y, 'bo')
+            self.ax.text(x, y, txt, fontsize='small', ha='right', va='top')
             xlim = (0, len_vb)
             ylim = (vbs.min(), vbs.max() + 10)
         else:
-            self.ax.text(0, 0, 'vbs contains nan', va='center', ha='center')
+            self.ax.text(
+                0, 0, 'No Variational Bound Values', va='center', ha='center')
             xlim = (-10, 10)
             ylim = (-10, 10)
-        title = 'variational bound (%d)' % len_vb
+        title = 'variational bound'
         self._decos_str(title=title)
         self._decos_grid(xlim=xlim, ylim=ylim)
 

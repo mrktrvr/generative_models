@@ -29,21 +29,43 @@ class CheckTools(object):
         interval = 10**interval_digit
         if itr % interval == 0 or itr == (max_itr - 1):
             logger.info('%s update :%5d / %5d (interval %d)' %
-                        (msg, itr, max_itr, interval))
+                        (msg, itr + 1, max_itr, interval))
         logger.debug('%s update :%5d / %5d' % (msg, itr, max_itr))
 
     @classmethod
-    def check_vb_increase(cls, vbs, i, decimals=0):
+    def check_vb_increase(cls, vbs, i, decimals=5):
+        dst = False
         if i < 1:
-            return True
-        vb_prv = nround(vbs[i - 1], decimals=decimals)
-        vb_cur = nround(vbs[i], decimals=decimals)
-        if vb_prv > vb_cur:
-            logger.error('vb decreased. iter:%d, %.10f(%.10f->%.10f)' %
-                         (i, vbs[i - 1] - vbs[i], vbs[i - 1], vbs[i]))
-            return False
+            dst = True
         else:
-            return True
+            if vbs[i - 1] == vbs[i]:
+                dst = True
+            else:
+                vb_prv = nround(vbs[i - 1], decimals=decimals)
+                vb_cur = nround(vbs[i], decimals=decimals)
+                if vb_prv > vb_cur:
+                    logger.error('vb decreased. iter:%d, %.10f(%.10f->%.10f)' %
+                                 (i, vbs[i - 1] - vbs[i], vbs[i - 1], vbs[i]))
+                    dst = False
+                else:
+                    dst = True
+        return dst
+
+    @classmethod
+    def is_conversed(clf, vbs, i, th):
+        dst = False
+        if i >= 1:
+            vb_diff = vbs[i] - vbs[i - 1]
+            dst = True if vb_diff < th else False
+        if dst:
+            logger.info(' '.join([
+                'iteration at %d.' % i,
+                'VB diff %f < %f' % (vb_diff, th),
+                '%3d: %f' % (i - 1, vbs[i - 1]),
+                '%3d: %f' % (i, vbs[i]),
+            ]))
+
+        return dst
 
 
 def init_expt(data_len, n_states, obs=None, mode='random'):
