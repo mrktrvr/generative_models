@@ -600,7 +600,7 @@ def _plotter_core(y, s, prm, vbs, prm_type_str, sup_title, figno):
 
 
 def gen_data(data_dim, n_states, data_len):
-    from helpers.calc_util import rand_wishart
+    from utils.calc_utils import rand_wishart
     from numpy.random import seed
     seed(1)
     hmm = Hmm(data_dim, n_states, expt_init_mode='random')
