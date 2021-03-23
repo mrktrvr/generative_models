@@ -1,6 +1,6 @@
 # generative_models
 generative_models
-- FA
+- FA $\pi$
 - MFA
 - GMM
 - HMM
