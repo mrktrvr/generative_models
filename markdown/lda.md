@@ -8,3 +8,4 @@ $$\begin{align}  "p(\\boldsymbol{S},\\boldsymbol{Z},\\boldsymbol{\\Phi},\\boldsy
     "\\\\\n",
     "p(\\boldsymbol{\\Pi})&=\\prod_{c=1}^{C}p(\\boldsymbol{\\pi}_c)=\\prod_{c=1}^{C}\\mathrm{Dir}(\\boldsymbol{\\pi}_c|\\boldsymbol{\\alpha}_{\\pi})\n",
 \\end{align}$$
+$\pi$
