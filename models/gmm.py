@@ -707,12 +707,12 @@ def update(y, n_states):
     data_dim, data_len = y.shape
     # --- setting
     gmm = Gmm(data_dim, n_states, expt_init_mode='random')
-    mu = zeros((data_dim, n_states))
-    gmm.set_params({'MuR': {'mu': mu}})
+    # mu = zeros((data_dim, n_states))
+    # gmm.set_params({'MuR': {'mu': mu}})
     gmm.init_expt_s(data_len)
     # --- plotter
     s = gmm.expt_s.argmax(0)
-    plotter(y, s, gmm, 2)
+    # plotter(y, s, gmm, 2)
     # --- update
     gmm.update(y)
     # --- plotter
@@ -728,8 +728,6 @@ def main():
     y = gen_data(data_dim, n_states, data_len)
     update(y, n_states)
     plt.pause(1)
-    from IPython import embed
-    embed()
 
 
 if __name__ == '__main__':
