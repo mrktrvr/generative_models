@@ -14,9 +14,9 @@ from numpy import tile
 from numpy import eye
 from numpy.random import randn
 
-cdir = os.getcwd()
-sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import inv
+CDIR = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(CDIR, '..'))
+from utils.calc_utils import inv
 
 
 class DefaultFaParams(object):

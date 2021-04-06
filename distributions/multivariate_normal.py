@@ -10,29 +10,29 @@ from numpy import newaxis
 from numpy import einsum
 from numpy import log
 from numpy import pi as np_pi
+from numpy import atleast_2d
 from numpy import zeros
-from numpy import ones
-from numpy import eye
-from numpy import tile
-from numpy import diag
 from numpy.random import multivariate_normal as mvnrnd
-from numpy.random import normal as uvnrnd
 
-from default_hyper_params import ParamMultivariateNormal
+CDIR = os.path.abspath(os.path.dirname(__file__))
 
-cdir = os.path.abspath(os.path.dirname(__file__))
-lib_root = os.path.join(cdir, '..')
-sys.path.append(lib_root)
-from util.calc_util import inv
-from util.calc_util import logsumexp
-from util.calc_util import logdet
-from util.logger import logger
+LIB_ROOT = os.path.join(CDIR, '..')
+sys.path.append(LIB_ROOT)
+from distributions.default_hyper_params import MultivariateNormalParams
+from utils.calc_utils import inv
+from utils.calc_utils import calc_lndet
+from utils.logger import logger
 
 
 class MultivariateNormal(object):
     '''
+    Multivariate normal distribution
+
     mvn = MultivaliateNormal(data_dim, n_states=1)
     mvn.set_params(mean=mu, cov=cov, prec=prec)
+    prms = mvn.get_params()
+    smp = mvn.samples(data_len=1)
+    mvn.clear_params()
     '''
 
     def __init__(self, data_dim, n_states=1, do_set_prm=False):
@@ -58,13 +58,14 @@ class MultivariateNormal(object):
         self.mu = None
         self.cov = None
         self.prec = None
-        self.mu2 = None
+        self.expt2 = None
         self.expt_prec = None
         self.expt_lndet_prec = None
         self.expt_prec_mu = None
         self.expt_mu_prec_mu = None
         if do_set_prm:
             self.set_params()
+            logger.info('Default hyper parameters has been set.')
 
     def clear_params(self):
         '''
@@ -84,50 +85,114 @@ class MultivariateNormal(object):
         mu: (data_dim, n_states) or (n_states)
         cov: (data_dim, data_dim, n_states) or (n_states)
         prec: (data_dim, data_dim, n_states) or (n_states)
+
+        expt2: <x x'> = mu mu' + Sigma
+        expt_prec: Sigma^{-1}
+        expt_lndet_prec: <ln|Sigma^{-1}|>
+        expt_prec_mu: <Sigma^{-1} mu>
+        expt_mu_prec_mu: <mu' Sigma^{-1} mu>
         '''
-        param_mvn = ParamMultivariateNormal(self.data_dim, self.n_states)
+        mvn_prms = MultivariateNormalParams(self.data_dim, self.n_states)
         mu = kargs.get('mu', None)
         cov = kargs.get('cov', None)
         prec = kargs.get('prec', None)
+        # --- mu
         if mu is None:
-            self.mu = param_mvn.mu
+            self.mu = mvn_prms.mu
         else:
             self.mu = mu
+        if self.mu.ndim == 1:
+            self.mu = atleast_2d(self.mu)
+
+        # --- precision and covariance
         if prec is None:
             if cov is None:
-                self.cov = param_mvn.cov
-                self.prec = self.calc_inv(self.cov)
+                self.cov = mvn_prms.cov
+                if self.cov.ndim == 1:
+                    self.cov = atleast_2d(self.cova)
+                self.prec = self._calc_inv(self.cov)
             else:
                 self.cov = cov
-                self.prec = self.calc_inv(self.cov)
+                if self.cov.ndim == 1:
+                    self.cov = atleast_2d(self.cova)
+                self.prec = self._calc_inv(self.cov)
         else:
             self.prec = prec
-            self.cov = self.calc_inv(self.prec)
-        self.n_states = self.mu.shape[-1]
-        if self.mu.ndim == 1:
-            self.data_dim = 1
-        else:
-            self.data_dim = self.mu.shape[0]
-        self.mu2 = self.calc_expt2()
-        self.expt_prec = self.prec
-        self.expt_lndet_prec = self.calc_lndet(self.prec)
-        self.expt_prec_mu = self.calc_prec_mu()
-        self.expt_mu_prec_mu = self.calc_mu_prec_mu()
+            if self.prec.ndim == 1:
+                self.prec = atleast_2d(self.prec)
+            self.cov = self._calc_inv(self.prec)
 
-    def get_param_dict(self):
+        # --- data size
+        self.data_dim = self.mu.shape[0]
+        self.n_states = self.mu.shape[-1]
+
+        # --- expectations
+        self.expt2 = self._calc_expt2()
+        self.expt_prec = self.prec
+        self.expt_lndet_prec = calc_lndet(self.prec)
+        self.expt_prec_mu = self._calc_prec_mu()
+        self.expt_mu_prec_mu = self._calc_mu_prec_mu()
+
+    def get_params(self):
         '''
-        prm = mvn.get_param_dict()
+        prm = mvn.get_params()
         dst: dictionary, {'mu': self.mu, 'cov': self.cov, 'prec': self.prec}
         '''
         dst = {'mu': self.mu, 'cov': self.cov, 'prec': self.prec}
         return dst
 
-    def set_param_dict(self, src):
+    def samples(self, data_len=1):
         '''
-        '''
-        self._set_param(**src)
+        mvn.samples(data_dim=1)
 
-    def calc_inv(self, src):
+        Argvs
+        data_len: number of samples
+
+        Returns
+        dst: (data_len, data_dim, n_states) or (data_len, n_states)
+        '''
+        dst = None
+        if self.mu.ndim == 2:
+            dst = zeros((data_len, self.mu.shape[0], self.mu.shape[1]))
+            if self.cov.ndim == 2:
+                for k in range(self.mu.shape[-1]):
+                    dst[:, :, k] = mvnrnd(
+                        self.mu[:, k], self.cov, size=data_len)
+            elif self.cov.ndim == 3:
+                for k in range(self.mu.shape[-1]):
+                    dst[:, :, k] = mvnrnd(
+                        self.mu[:, k], self.cov[:, :, k], size=data_len)
+            else:
+                self._log_error_not_supported()
+        elif self.mu.ndim == 3:
+            if self.cov.ndim == 3:
+                for d in range(self.mu.shape[-2]):
+                    for k in range(self.mu.shape[-1]):
+                        dst[:, d, k] = mvnrnd(
+                            self.mu[d, k], self.cov[:, :, k], size=data_len)
+            elif self.cov.ndim == 4:
+                aug_dim, data_dim, n_states = self.mu.shape
+                dst = zeros((data_len, aug_dim, data_dim, n_states))
+                for d in range(data_dim):
+                    for k in range(n_states):
+                        dst[:, :, d, k] = mvnrnd(
+                            self.mu[:, d, k],
+                            self.cov[:, :, d, k],
+                            size=data_len)
+            else:
+                self.__log_error_not_supported()
+        elif self.mu.ndim == 1:
+            raise Exception('self.mu.ndim must be >= 1')
+        else:
+            self.__log_error_not_supported()
+        if data_len == 1:
+            dst = dst[0]
+        return dst
+
+    def expectations(self):
+        return self.mu, self.expt_prec
+
+    def _calc_inv(self, src):
         if src.ndim == 1:
             dst = 1.0 / src
         elif src.ndim == 2:
@@ -141,15 +206,11 @@ class MultivariateNormal(object):
             dst = None
         return dst
 
-    def calc_expt2(self):
-        if self.mu.ndim == 1:
-            if self.cov.ndim == 1:
-                mm = einsum('l,l->l', self.mu, self.mu)
-            elif self.cov.ndim == 2:
-                mm = einsum('l,j->lj', self.mu, self.mu)
-            elif self.cov.ndim == 3:
-                mm = einsum('l,j->lj', self.mu, self.mu)[:, newaxis]
-        elif self.mu.ndim == 2:
+    def _calc_expt2(self):
+        '''
+        expt2 = <mu mu'> = mu mu' + Sigma
+        '''
+        if self.mu.ndim == 2:
             if self.cov.ndim == 2:
                 mm = einsum('lk,jk->lj', self.mu, self.mu)
             elif self.cov.ndim == 3:
@@ -165,8 +226,10 @@ class MultivariateNormal(object):
             else:
                 self._log_error_not_supported()
                 mm = None
+        elif self.mu.ndim == 1:
+            raise Exception('self.mu.ndim must be >= 1')
         else:
-            self._log_error_not_supported()
+            self.__log_error_not_supported()
             mm = None
         if mm is not None:
             expt2 = self.cov + mm
@@ -174,15 +237,8 @@ class MultivariateNormal(object):
             expt2 = None
         return expt2
 
-    def calc_prec_mu(self):
-        if self.mu.ndim == 1:
-            if self.cov.ndim == 1:
-                pm = self.prec * self.mu
-            elif self.cov.ndim == 2:
-                pm = einsum('lj,j->l', self.prec, self.mu)
-            elif self.cov.ndim == 3:
-                pm = einsum('ljk,jk->lk', self.prec, self.mu)
-        elif self.mu.ndim == 2:
+    def _calc_prec_mu(self):
+        if self.mu.ndim == 2:
             if self.cov.ndim == 2:
                 pm = einsum('lj,jk->lk', self.prec, self.mu)
             elif self.cov.ndim == 3:
@@ -198,26 +254,21 @@ class MultivariateNormal(object):
             else:
                 self._log_error_not_supported()
                 pm = None
+        elif self.mu.ndim == 1:
+            raise Exception('self.mu.ndim must be >= 1')
         else:
-            self._log_error_not_supported()
+            self.__log_error_not_supported()
             pm = None
         return pm
 
-    def calc_mu_prec_mu(self):
-        if self.mu.ndim == 1:
-            if self.cov.ndim == 1:
-                mpm = self.mu**2 * self.prec
-            elif self.cov.ndim == 2:
-                mpm = einsum('l,lj,j->', self.mu, self.prec, self.mu)
-            elif self.cov.ndim == 3:
-                mpm = einsum('lk,ljk,jk->k', self.mu, self.prec, self.mu)
-        elif self.mu.ndim == 2:
+    def _calc_mu_prec_mu(self):
+        if self.mu.ndim == 2:
             if self.cov.ndim == 2:
                 mpm = einsum('lk,lj,jk->k', self.mu, self.prec, self.mu)
             elif self.cov.ndim == 3:
                 mpm = einsum('lk,ljk,jk->k', self.mu, self.prec, self.mu)
             else:
-                self._log_error_not_supported()
+                self.__log_error_not_supported()
         elif self.mu.ndim == 3:
             if self.cov.ndim == 3:
                 m = einsum('llk->lk', self.mu)
@@ -226,85 +277,16 @@ class MultivariateNormal(object):
                 m = self.mu
                 mpm = einsum('ldk,ljdk,jdk->dk', m, self.prec, m)
             else:
-                self._log_error_not_supported()
+                self.__log_error_not_supported()
                 mpm = None
+        elif self.mu.ndim == 1:
+            raise Exception('self.mu.ndim must be >= 1')
         else:
-            self._log_error_not_supported()
+            self.__log_error_not_supported()
             mpm = None
         return mpm
 
-    def calc_lndet(self, src):
-        if src.ndim == 1:
-            dst = src
-        elif src.ndim == 2:
-            dst = logdet(src)
-        elif src.ndim == 3:
-            dst = logdet(src.transpose(2, 0, 1))
-        elif src.ndim == 4:
-            dst = logdet(src.transpose(2, 3, 0, 1))
-        else:
-            self._log_error_not_supported()
-            dst = None
-        return dst
-
-    def sample(self, data_len=1):
-        '''
-        mvn.sample(data_dim=1)
-        @argvs
-        data_len: number of samples
-        dst: (data_len, data_dim, n_states)
-        '''
-        '''
-        dst: (data_len, n_states)
-        dst: (data_len, data_dim, n_states)
-        '''
-        dst = None
-        if self.mu.ndim == 1:
-            if self.cov.ndim == 1:
-                n_states = self.mu.shape[-1]
-                dst = zeros((data_len, n_states))
-                for k, (m, c) in enumerate(zip(self.mu, self.cov)):
-                    dst[:, k] = uvnrnd(m, c, size=data_len)
-            elif self.cov.ndim == 2:
-                dst = mvnrnd(self.mu, self.cov, size=data_len)
-            elif self.cov.ndim == 3:
-                self._log_error_not_supported()
-        elif self.mu.ndim == 2:
-            dst = zeros((data_len, self.mu.shape[0], self.mu.shape[1]))
-            if self.cov.ndim == 2:
-                for k in xrange(self.mu.shape[-1]):
-                    dst[:, :, k] = mvnrnd(
-                        self.mu[:, k], self.cov, size=data_len)
-            elif self.cov.ndim == 3:
-                for k in xrange(self.mu.shape[-1]):
-                    dst[:, :, k] = mvnrnd(
-                        self.mu[:, k], self.cov[:, :, k], size=data_len)
-            else:
-                self._log_error_not_supported()
-        elif self.mu.ndim == 3:
-            if self.cov.ndim == 3:
-                for d in xrange(self.mu.shape[-2]):
-                    for k in xrange(self.mu.shape[-1]):
-                        dst[:, d, k] = mvnrnd(
-                            self.mu[d, k], self.cov[:, :, k], size=data_len)
-            elif self.cov.ndim == 4:
-                aug_dim, data_dim, n_states = self.mu.shape
-                dst = zeros((data_len, aug_dim, data_dim, n_states))
-                for d in xrange(data_dim):
-                    for k in xrange(n_states):
-                        dst[:, :, d, k] = mvnrnd(
-                            self.mu[:, d, k],
-                            self.cov[:, :, d, k],
-                            size=data_len)
-            else:
-                self._log_error_not_supported()
-        else:
-            self._log_error_not_supported()
-        if data_len == 1:
-            dst = dst[0]
-        return dst
-
-    def calc_lkh(self, Y, YY=None):
+    def _calc_lkh(self, Y, YY=None):
         data_dim, data_len = Y.shape
         ln_lkh = zeros((self.n_states, data_len))
         ln_lkh -= 0.5 * data_dim * log(2 * np_pi)
@@ -316,19 +298,24 @@ class MultivariateNormal(object):
         ln_lkh -= 0.5 * self.expt_mu_prec_mu[:, newaxis]
         return ln_lkh
 
-    def _log_error_not_supported(self):
-        logger.error(
-            'mean and prec of ndim (%d, %d) not supported' %
-            (self.mu.ndim, self.cov.ndim))
+    def __log_error_not_supported(self):
+        logger.error('mean and prec of ndim (%d, %d) not supported' %
+                     (self.mu.ndim, self.cov.ndim))
 
     def __str__(self):
-        res = '-' * 7
-        res += 'type: %s\n' % self.__class__.__name__
-        res += 'mu.ndim : %d\n' % self.mu.ndim
-        res += 'mu.shape: %s\n' % ','.join(['%d' % x for x in self.mu.shape])
-        res += 'mean.ndim : %d\n' % self.mu.ndim
-        res += 'mean.shape: %s\n' % ','.join(['%d' % x for x in self.mu.shape])
-        res += ('-' * 7)
+        res = '\n'.join([
+            '-' * 7,
+            '%15s: %s' % ('class name', self.__class__.__name__),
+            '%15s: %d' % ('data dim', self.data_dim),
+            '%15s: %d' % ('num states', self.n_states),
+            '%15s: %d' % ('mean  ndim', self.mu.ndim),
+            '%15s: %s' % ('mean shape', self.mu.shape),
+            '%15s: %d' % ('cov  ndim', self.cov.ndim),
+            '%15s: %s' % ('cov shape', self.cov.shape),
+            '%15s: %d' % ('precision  ndim', self.cov.ndim),
+            '%15s: %s' % ('precision shape', self.cov.shape),
+            '-' * 7,
+        ])
         return res
 
 
@@ -337,9 +324,30 @@ if __name__ == '__main__':
     dist_dim = 2
     data_dim = 4
     n_states = 3
+    data_len = 100
     mvn = MultivariateNormal(data_dim, n_states, do_set_prm=True)
-    print mvn
-    print mvn.mu
-    print mvn.cov
-    samp_mu = mvn.sample(100)
-    print samp_mu
+    smp = mvn.samples(data_len)
+    print(mvn)
+    print(smp.shape)
+    print('\n'.join([
+        '--- mean',
+        '\n'.join([
+            '%2d: %s' % (k, ','.join(['%6.2f' % x for x in mvn._mu[:, k]]))
+            for k in range(n_states)
+        ]),
+        '--- cov (diag)',
+        '\n'.join([
+            'k=%2d:%s' %
+            (k,
+             ','.join(['%6.2f' % mvn._cov[d, d, k] for d in range(data_dim)]))
+            for k in range(n_states)
+        ]),
+        '--- samples',
+        '\n'.join([
+            't:%4d - %s' % (t, ', '.join([
+                'k:%2d [%s]' %
+                (k, ','.join(['%6.2f' % smp_t[d, k] for d in range(data_dim)]))
+                for k in range(n_states)
+            ])) for t, smp_t in enumerate(smp)
+        ]),
+    ]))

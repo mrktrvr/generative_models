@@ -16,13 +16,13 @@ from numpy.random import multivariate_normal as mvnrnd
 from scipy.special import digamma
 from scipy.stats import wishart
 
-from .default_hyper_params import ParamNormalWishart
+from .default_hyper_params import NormalWishartParams
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import inv
-from util.calc_util import logdet
-from util.logger import logger
+from utils.calc_utils import inv
+from utils.calc_utils import logdet
+from utils.logger import logger
 
 
 class NormalWishart(object):
@@ -94,7 +94,7 @@ class NormalWishart(object):
         W: data_dim x data_dim x n_states
         inv_W: data_dim x data_dim x n_states
         '''
-        prm_nw = ParamNormalWishart(self.data_dim, self.n_states)
+        prm_nw = NormalWishartParams(self.data_dim, self.n_states)
         # --- beta
         beta = argvs.get('beta', None)
         if beta is not None:
@@ -186,7 +186,7 @@ class NormalWishart(object):
         if R is None:
             R = self.sample_R()[0]
         mu = zeros((data_len, self.data_dim, self.n_states))
-        for k in xrange(self.n_states):
+        for k in range(self.n_states):
             # cov = inv(self.beta[k] * R[:, :, k])
             cov = inv(R[:, :, k])
             try:
@@ -204,14 +204,15 @@ class NormalWishart(object):
         R: (data_len, data_dim, data_dim, n_states)
         '''
         R = zeros((data_len, self.data_dim, self.data_dim, self.n_states))
-        for k in xrange(self.n_states):
+        for k in range(self.n_states):
             nu = self.nu[k]
             W = self.W[:, :, k]
             try:
                 R[:, :, :, k] = wishart.rvs(nu, W, size=data_len)
-            except:
+            except Exception as exception:
                 R[:, :, :, k] = tile((nu * W), (data_len, 1, 1))
-                logger.warn('whshart.rvs failed set expectations instead')
+                logger.warn('whshart.rvs failed set expectations instead. (%s)'
+                            % exception)
         return R
 
     def sample_mu_R(self, data_len=1):

@@ -15,13 +15,13 @@ from scipy.special import digamma
 
 from IPython import embed
 
-from default_hyper_params import ParamGamma
-
-cdir = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import inv
-from util.calc_util import logsumexp
-from util.logger import logger
+CDIR = os.path.abspath(os.path.dirname(__file__))
+LIB_ROOT = os.path.join(CDIR, '..')
+sys.path.append(LIB_ROOT)
+from distributions.default_hyper_params import ParamGamma
+from utils.calc_utils import inv
+from utils.calc_utils import logsumexp
+from utils.logger import logger
 
 
 class Gamma:
@@ -125,7 +125,7 @@ class Gamma:
             ln_diag_expt = None
         return ln_diag_expt
 
-    def sample(self, data_len=1):
+    def samples(self, data_len=1):
         if self.a.ndim == 1:
             dst = gamrand(self.a, 1.0 / self.b)
         elif self.a.ndim == 2:
@@ -137,6 +137,9 @@ class Gamma:
             logger.error('ndim %d is not supported' % self.expt.ndim)
             dst = None
         return dst
+
+    def expectations(self):
+        return self.expt
 
     def __str__(self):
         res = '-' * 7
@@ -158,11 +161,11 @@ class Gamma:
             dst = [[fmt % a for a in src]]
         elif src.ndim == 2:
             dst = []
-            for k in xrange(src.shape[-1]):
+            for k in range(src.shape[-1]):
                 dst.append([fmt % a for a in src[:, k]])
         elif src.ndim == 3:
             dst = []
-            for k in xrange(src.shape[-1]):
+            for k in range(src.shape[-1]):
                 dst.append([fmt % a for a in diag(src[:, :, k])])
         else:
             logger.error('ndim %d is not supported' % src.ndim)
@@ -183,5 +186,4 @@ if __name__ == '__main__':
     a = ones((data_dim, n_states)) * 1e+3
     b = ones((data_dim, n_states))
     gd = Gamma(a=a, b=b)
-    print gd
     embed(header=__file__)

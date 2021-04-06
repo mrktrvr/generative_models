@@ -8,13 +8,12 @@ from numpy import newaxis
 from numpy import arange
 from numpy import zeros
 from numpy import ones
-from numpy import tile
 from numpy import log
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import logmatprod
-from util.calc_util import logsumexp
+from utils.calc_utils import logmatprod
+from utils.calc_utils import logsumexp
 
 
 class ForwardBackward(object):
@@ -47,7 +46,7 @@ class ForwardBackward(object):
         n_states, data_len = ln_obs_lkh.shape
         ln_fwd = ones((n_states, data_len)) * nan
         ln_c = zeros((data_len)) * nan
-        for t in xrange(0, data_len):
+        for t in range(0, data_len):
             if t == 0:
                 tmp = ln_obs_lkh[:, t] + ln_pi
             else:
@@ -66,7 +65,7 @@ class ForwardBackward(object):
         n_states, data_len = ln_obs_lkh.shape
         ln_bwd = ones((n_states, data_len)) * nan
         ln_bwd[:, -1] = 0
-        for t in xrange(data_len - 1, 0, -1):
+        for t in range(data_len - 1, 0, -1):
             tmp = ln_bwd[:, t] + ln_obs_lkh[:, t]
             ln_bwd[:, t - 1] = logmatprod(tmp, ln_trans.T)
             ln_bwd[:, t - 1] -= ln_c[t]
@@ -105,8 +104,8 @@ class ForwardBackward(object):
         ln_fwd, ln_c = self._calc_fwd(ln_obs_lkh, ln_pi, ln_trans)
         ln_bwd = self._calc_bwd(ln_obs_lkh, ln_trans, ln_c)
         ln_expt = self._calc_ln_expt(ln_fwd, ln_bwd)
-        ln_expt2 = self._calc_ln_expt2(
-            ln_obs_lkh, ln_trans, ln_fwd, ln_bwd, ln_c)
+        ln_expt2 = self._calc_ln_expt2(ln_obs_lkh, ln_trans, ln_fwd, ln_bwd,
+                                       ln_c)
         ln_lkh = ln_c.sum()
         return ln_expt, ln_expt2, ln_lkh
 
@@ -130,12 +129,12 @@ def main():
     t_bgn = time.time()
     ln_expt, ln_expt2, ln_lkh = fb_alg()
     t_end = time.time()
-    print 'data_len : %d' % data_len
-    print 'n_states : %d' % n_states
-    print 'ln_expt  : shape = %s' % list(ln_expt.shape)
-    print 'ln_expt2 : shape = %s' % list(ln_expt2.shape)
-    print 'ln_lkh   : %f' % ln_lkh
-    print 'calc time: %.3f' % (t_end - t_bgn)
+    print('data_len : %d' % data_len)
+    print('n_states : %d' % n_states)
+    print('ln_expt  : shape = %s' % list(ln_expt.shape))
+    print('ln_expt2 : shape = %s' % list(ln_expt2.shape))
+    print('ln_lkh   : %f' % ln_lkh)
+    print('calc time: %.3f' % (t_end - t_bgn))
 
 
 if __name__ == '__main__':

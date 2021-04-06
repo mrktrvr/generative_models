@@ -15,8 +15,8 @@ from scipy.special import gammaln
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.calc_util import inv
-from util.calc_util import logdet
+from utils.calc_utils import inv
+from utils.calc_utils import logdet
 
 
 def KL_Dir(ln_alpha_h, ln_alpha):
@@ -47,9 +47,8 @@ def KL_Gamma(ln_a_h, ln_b_h, ln_a, ln_b):
     '''
     a_h = exp(ln_a_h)
     a = exp(ln_a)
-    val = (
-        -gammaln(a_h) + gammaln(a) + a * (ln_b_h - ln_b) +
-        (a_h - a) * digamma(a_h) - a_h + exp(ln_b + ln_a_h - ln_b_h))
+    val = (-gammaln(a_h) + gammaln(a) + a * (ln_b_h - ln_b) +
+           (a_h - a) * digamma(a_h) - a_h + exp(ln_b + ln_a_h - ln_b_h))
     return val
 
 
@@ -66,9 +65,8 @@ def KL_Gauss(mu_h, sig_h, mu, sig):
     data_dim = len(mu_h)
     inv_sig = inv(sig)
     mu_h_mu = mu_h - mu
-    val = 0.5 * (
-        einsum('d,de,e->', mu_h_mu, inv_sig, mu_h_mu) + trace(
-            dot(inv_sig, sig_h)) - data_dim + logdet(sig) - logdet(sig_h))
+    val = 0.5 * (einsum('d,de,e->', mu_h_mu, inv_sig, mu_h_mu) + trace(
+        dot(inv_sig, sig_h)) - data_dim + logdet(sig) - logdet(sig_h))
     return val
 
 
@@ -87,9 +85,8 @@ def KL_Norm_Wish(beta_h, mu_h, nu_h, W_h, beta, mu, nu, W):
         m_diff = mu_h - mu
         m_diff2 = einsum('i,j->ij', m_diff, m_diff)
         m_diff2_R = einsum('ij,ji->...', m_diff2, beta * R)
-        val += 0.5 * (
-            m_diff2_R + data_dim * log(beta_h / beta) + data_dim *
-            (beta / beta_h - 1))
+        val += 0.5 * (m_diff2_R + data_dim * log(beta_h / beta) + data_dim *
+                      (beta / beta_h - 1))
     else:
         m_diff = mu_h - mu
         m_diff2 = einsum('dk,ek->dek', m_diff, m_diff)

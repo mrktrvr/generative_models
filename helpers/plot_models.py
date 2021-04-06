@@ -28,9 +28,9 @@ from matplotlib import pyplot as plt
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
-from util.plot_util import StateColor
-from util.logger import logger
-from util.time_util import TimeUtil
+from utils.plot_utils import StateColor
+from utils.logger import logger
+from utils.time_utils import TimeUtil
 
 
 class PlotModelsGrid():
@@ -159,8 +159,10 @@ class PlotModels():
         if pltx[0] > 1483228800:
             tu = TimeUtil()
             xtck_lbls = [tu.ut2ts(x) for x in pltx[::xtick_step]]
+            xtck_lbls += [tu.ut2ts(pltx[-1] + 1)]
         else:
             xtck_lbls = [x for x in pltx[::xtick_step]]
+            xtck_lbls += [pltx[-1] + 1]
         self.ax.set_xticks(xtck)
         self.ax.set_xticklabels(xtck_lbls, rotation=90, fontsize=self.f_size)
 
@@ -172,6 +174,12 @@ class PlotModels():
     def ion_show(self):
         plt.ion()
         plt.show()
+
+    def show(self):
+        plt.show()
+
+    def sup_title(self, sup_title):
+        plt.suptitle(sup_title)
 
     def tight_layout(self):
         try:
@@ -246,8 +254,8 @@ class PlotModels():
         # --- width and height
         v = 2.0 * sqrt(2.0) * sqrt(eig_v)
         w, h = v[idx1], v[idx2]
-        h *= 1e+1
-        w *= 1e+1
+        h *= 1e+0
+        w *= 1e+0
         m = mu[idx]
         return m, w, h, deg
 
@@ -338,6 +346,7 @@ class PlotModels():
         ymin = args.get('ymin', None)
         xlbl = args.get('xlbl', '')
         ylbl = args.get('ylbl', '')
+        baseline = args.get('baseline', 'sym')
         ymin = src.min() if ymin is None else ymin
         ymax = nanmax(abs(src))
         src = atleast_2d(src)
@@ -355,11 +364,14 @@ class PlotModels():
             else:
                 n_states = cat.shape[0]
                 y = cat
-            lbls = ['%d' % k for k in range(n_states)] if lbls is None else lbls
+            lbls = ['%d' % k
+                    for k in range(n_states)] if lbls is None else lbls
             clr = StateColor(n_states).get_color_list()
             y *= ymax
+            if baseline != 'zero':
+                y *= 2
             self.ax.stackplot(
-                pltx, y, colors=clr, alpha=0.5, labels=lbls, baseline='zero')
+                pltx, y, colors=clr, alpha=0.5, labels=lbls, baseline=baseline)
         xlim = (pltx[0], pltx[-1])
         ylim = (ymin, ymax)
         self._decos_xticks(pltx)
@@ -499,6 +511,7 @@ class PlotModels():
         fmt = args.get('fmt', '%8.2f')
         cspan = args.get('cspan', 1)
         rspan = args.get('rspan', 1)
+        title = args.get('title', '')
         self.ax = self.get_ax(pos, rspan=rspan, cspan=cspan)
         ndim = src.ndim
         n_states = src.shape[0]
@@ -524,6 +537,7 @@ class PlotModels():
             loc='center',
             cellLoc='center',
             colLoc='center')
+        self.ax.set_title(title, fontsize=self.f_size)
         self.ax.set_axis_off()
 
     def plot_vb(self, pos, vbs, **args):
@@ -532,21 +546,28 @@ class PlotModels():
         from numpy import diff
         cspan = args.get('cspan', 1)
         rspan = args.get('rspan', 1)
-        len_vb = len(vbs)
         self.ax = self.get_ax(pos, rspan=rspan, cspan=cspan)
-        if not nany(isnan(vbs)):
+        if vbs is not None and not nany(isnan(vbs)):
+            len_vb = len(vbs)
             self.ax.plot(vbs, label='vbs')
             vb_df = diff(vbs)
-            for i, v in enumerate(vb_df, 1):
-                if v < 0:
-                    self.ax.plot(i, v, 'rx', label='%d' % i)
+            vb_df_neg_idx = arange(len(vb_df))[vb_df < 0] + 1
+            vb_negs = vbs[vb_df_neg_idx]
+            self.ax.plot(vb_df_neg_idx, vb_negs, 'rx', ms=10)
+            for i, v in zip(vb_df_neg_idx, vb_negs):
+                self.ax.text(i, v, '%d: %f' % (i, v), ha='right', va='top')
+            x, y = len_vb - 1, vbs[-1]
+            txt = 'Itr:%d,VB:%f' % (x, y)
+            self.ax.plot(x, y, 'bo')
+            self.ax.text(x, y, txt, fontsize='small', ha='right', va='top')
             xlim = (0, len_vb)
             ylim = (vbs.min(), vbs.max() + 10)
         else:
-            self.ax.text(0, 0, 'vbs contains nan', va='center', ha='center')
+            self.ax.text(
+                0, 0, 'No Variational Bound Values', va='center', ha='center')
             xlim = (-10, 10)
             ylim = (-10, 10)
-        title = 'variational bound (%d)' % len_vb
+        title = 'variational bound'
         self._decos_str(title=title)
         self._decos_grid(xlim=xlim, ylim=ylim)
 

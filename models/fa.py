@@ -18,17 +18,20 @@ from numpy import sum as nsum
 from numpy import einsum
 from numpy.random import multivariate_normal as mvnrnd
 
-import cPickle as pickle
+import pickle
 
-cdir = os.path.abspath(os.path.dirname(__file__))
-lib_root = os.path.join(cdir, '..')
-sys.path.append(lib_root)
+CDIR = os.path.abspath(os.path.dirname(__file__))
 
-from util.logger import logger
-from util.calc_util import inv
+sys.path.append(CDIR)
+from default_model_params import DefaultFaParams
+
+LIB_ROOT = os.path.join(CDIR, '..')
+sys.path.append(LIB_ROOT)
+
+from utils.logger import logger
+from utils.calc_utils import inv
 from distributions.multivariate_normal import MultivariateNormal
 from distributions.gamma import Gamma
-from models.default_model_params import DefaultFaParams
 
 
 class qZ(object):
@@ -48,19 +51,19 @@ class qZ(object):
         self.mu = None
         self.cov = None
         self.prec = None
-        self.mu2 = None
+        self.expt2 = None
 
     def init_expt(self, data_len):
         '''
         self.mu: (aug_dim, data_len)
         self.cov: (aug_dim, aug_dim)
         self.prec: (aug_dim, aug_dim)
-        self.mu2: (aug_dim, aug_dim, data_len)
+        self.expt2: (aug_dim, aug_dim, data_len)
         '''
         self.mu = tile(self.prior.mu, (1, data_len))
         self.cov = ncopy(self.prior.cov[:, :, 0])
         self.prec = ncopy(self.prior.prec[:, :, 0])
-        self.mu2 = self.calc_expt2()
+        self.expt2 = self.calc_expt2()
 
     def set_default_priors(self):
         m, c, p = DefaultFaParams().Z(self.fa_dim)
@@ -77,13 +80,13 @@ class qZ(object):
         '''
         z.update(Y)
         lamb.mu: <lamb> array(aug_dim, data_dim)
-        lamb.post.mu2: <lamblambT> array(aug_dim, aug_dim, data_dim)
+        lamb.post.expt2: <lamblambT> array(aug_dim, aug_dim, data_dim)
         r.post.expt: <R> array(data_dim)
         lamb.post.mu: <lamb> array(aug_dim, data_dim)
 
         '''
         # -- prec
-        rll = einsum('ddk,ljdk->lj', theta.r.post.expt, theta.lamb.post.mu2)
+        rll = einsum('ddk,ljdk->lj', theta.r.post.expt, theta.lamb.post.expt2)
         self.prec = rll + self.prior.prec[:, :, 0]
         # --- cov
         self.cov = inv(self.prec)
@@ -92,11 +95,11 @@ class qZ(object):
         lry = einsum('ld,dt->lt', lr, Y)
         lry_muz = lry + self.prior.expt_prec_mu[:, 0, newaxis]
         self.mu = einsum('lj,jt->lt', self.cov, lry_muz)
-        self.mu2 = self.calc_expt2()
+        self.expt2 = self.calc_expt2()
 
-    def get_samples(self, data_len, by_posterior=True):
+    def samples(self, data_len, by_posterior=True):
         '''
-        z.get_samples(data_len)
+        z.samples(data_len)
         data_len: 100
         @return
         sample_z: (aug_dim, n_states, data_len)
@@ -105,14 +108,18 @@ class qZ(object):
             sample_z = ones((self.aug_dim, data_len)) * nan
             mu_len = 0 if self.mu is None else self.mu.shape[-1]
             t_max = data_len if data_len < mu_len else mu_len
-            for t in xrange(t_max):
+            for t in range(t_max):
                 sample_z[:, t] = mvnrnd(self.mu[:, t], self.cov)
             t_rest = data_len - t_max
             if t_rest > 0:
-                sample_z[:, t_max:] = self.prior.sample(t_rest)[:, :, 0].T
+                sample_z[:, t_max:] = self.prior.samples(t_rest)[:, :, 0].T
         else:
-            sample_z = self.prior.sample(data_len)[:, :, 0].T
+            sample_z = self.prior.samples(data_len)[:, :, 0].T
         return sample_z
+
+    def expectations(self, by_posterior=True):
+        dst = tile(self.mu, (self.n_states, 1, 1)).transpose(1, 0, 2)
+        return dst
 
     def calc_expt2(self):
         mm = einsum('lt,jt->ljt', self.mu, self.mu) + self.cov[:, :, newaxis]
@@ -144,8 +151,8 @@ class qLamb(object):
         '''
         lamb.set_default_params()
         '''
-        pm, pc = DefaultFaParams().Lamb(
-            self.fa_dim, self.data_dim, self.n_states)
+        pm, pc = DefaultFaParams().Lamb(self.fa_dim, self.data_dim,
+                                        self.n_states)
         self.set_params(mu=pm, cov=pc)
 
     def set_params(self, **argvs):
@@ -158,10 +165,10 @@ class qLamb(object):
         lamb.update(Y, z, r)
         Y: array(data_dim, data_len)
         r.post.expt: <R>
-        z.post.mu2: <ZZ>
+        z.post.expt2: <ZZ>
         '''
         # --- prec (inv(cov))
-        rzz = einsum('ddk,ljt->ljdk', r.post.expt, z.mu2)
+        rzz = einsum('ddk,ljt->ljdk', r.post.expt, z.expt2)
         prec = self.prior.prec + rzz
         # --- cov
         cov = inv(prec.transpose(2, 3, 1, 0)).transpose(2, 3, 0, 1)
@@ -172,19 +179,29 @@ class qLamb(object):
         mean = einsum('ljdk,jdk->ldk', cov, pm_ryz)
         self.post.set_params(mu=mean, cov=cov, prec=prec)
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         '''
-        m = lamb.get_samples(data_len=1, by_posterior=True)
+        m = lamb.samples(data_len=1, by_posterior=True)
         '''
         if by_posterior:
-            m = self.post.sample(data_len)
+            m = self.post.samples(data_len)
         else:
-            m = self.prior.sample(data_len)
+            m = self.prior.samples(data_len)
         return m
 
-    def get_param_dict(self, by_posterior=True):
+    def expectations(self, by_posterior=True):
         '''
-        qpi.get_param_dict(by_posterior=True)
+        m = lamb.expectations(by_posterior=True)
+        '''
+        if by_posterior:
+            mu, prec = self.post.expectations()
+        else:
+            mu, prec = self.prior.expextations()
+        return mu
+
+    def get_params(self, by_posterior=True):
+        '''
+        qpi.get_params(by_posterior=True)
         @argvs
         data_len: data_lengs
         by_posterior: parameters of posterior(True) or prior(False)
@@ -192,9 +209,9 @@ class qLamb(object):
         dst: {'alpha': np.array(n_states), 'ln_alpha': np.array(n_states)}
         '''
         if by_posterior:
-            dst = self.post.get_param_dict()
+            dst = self.post.get_params()
         else:
-            dst = self.prior.get_param_dict()
+            dst = self.prior.get_params()
         return dst
 
 
@@ -241,25 +258,36 @@ class qR(object):
         y2 = Y**2
         yz = einsum('dt,lt->dlt', Y, z.mu)
         yzl = einsum('dlt,ldk->dt', yz, lamb.post.mu)
-        tr_z2l2 = einsum('ljt,jldk->dt', z.mu2, lamb.post.mu2)
+        tr_z2l2 = einsum('ljt,jldk->dt', z.expt2, lamb.post.expt2)
         sum_y2_yzl_tr_z2l2 = 0.5 * nsum(y2 - 2 * yzl + tr_z2l2, 1)
         b = self.prior.b + sum_y2_yzl_tr_z2l2[:, newaxis]
         self.post.set_params(a=a, b=b)
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         '''
-        r = r.get_samples(data_len=1, by_posterior=True)
+        r = r.samples(data_len=1, by_posterior=True)
         '''
         if by_posterior:
-            r = self.post.sample(data_len)
+            r = self.post.samples(data_len)
         else:
-            r = self.prior.sample(data_len)
+            r = self.prior.samples(data_len)
         r = einsum('dk,de->dek', r, eye(self.data_dim))
         return r
 
-    def get_param_dict(self, by_posterior=True):
+    def expectations(self, by_posterior=True):
         '''
-        qpi.get_param_dict(by_posterior=True)
+        r = r.samples(data_len=1, by_posterior=True)
+        '''
+        if by_posterior:
+            r = self.post.expectations()
+        else:
+            r = self.prior.expectations()
+        r = einsum('dk,de->dek', r, eye(self.data_dim))
+        return r
+
+    def get_params(self, by_posterior=True):
+        '''
+        qpi.get_params(by_posterior=True)
         @argvs
         data_len: data_lengs
         by_posterior: parameters of posterior(True) or prior(False)
@@ -267,9 +295,9 @@ class qR(object):
         dst: {'alpha': np.array(n_states), 'ln_alpha': np.array(n_states)}
         '''
         if by_posterior:
-            dst = self.post.get_param_dict()
+            dst = self.post.get_params()
         else:
-            dst = self.prior.get_param_dict()
+            dst = self.prior.get_params()
         return dst
 
 
@@ -349,7 +377,7 @@ class Theta(object):
                 logger.error('%s is not supported' % uo)
                 sys.exit(-1)
 
-    def get_param_dict(self, by_posterior=True):
+    def get_params(self, by_posterior=True):
         '''
         theta.get_params(by_posterior)
         @argvs
@@ -361,18 +389,26 @@ class Theta(object):
             }
         '''
         dst = {
-            'Lamb': self.qlamb.get_param_dict(by_posterior),
-            'R': self.qr.get_param_dict(by_posterior),
+            'Lamb': self.qlamb.get_params(by_posterior),
+            'R': self.qr.get_params(by_posterior),
         }
         return dst
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         '''
-        l, r = theta.get_samples(data_len=1, by_posterior=True)
+        l, r = theta.samples(data_len=1, by_posterior=True)
         '''
-        l = self.lamb.get_samples(data_len, by_posterior)
-        r = self.r.get_samples(data_len, by_posterior)
-        return l, r
+        lamb = self.lamb.samples(data_len, by_posterior)
+        r = self.r.samples(data_len, by_posterior)
+        return lamb, r
+
+    def expectations(self, data_len=1, by_posterior=True):
+        '''
+        l, r = theta.expectations(by_posterior=True)
+        '''
+        lamb = self.lamb.samples(data_len, by_posterior)
+        r = self.r.samples(data_len, by_posterior)
+        return lamb, r
 
 
 class Fa(object):
@@ -390,7 +426,6 @@ class Fa(object):
         self.z = qZ(self.fa_dim)
         self.theta = Theta(self.fa_dim, self.data_dim)
         # --- update setting
-        self.max_itr = argvs.get('max_itr', 100)
         self.update_order = [
             'Z',
             'Theta',
@@ -421,14 +456,15 @@ class Fa(object):
         '''
         self.theta.set_params(prm)
 
-    def update(self, Y):
+    def update(self, Y, max_itr=100):
         '''
         fa.update(Y)
         '''
-        logger.info(
-            'update order %s, in Theta %s' %
-            (self.update_order, self.theta.update_order))
-        for i in xrange(self.max_itr):
+        logger.info('EM update order %s' % self.update_order)
+        logger.info('Theta update order %s' % self.theta.update_order)
+        ibgn = 0
+        iend = max_itr
+        for i in range(ibgn, iend):
             for j, uo in enumerate(self.update_order):
                 if uo == 'Z':
                     self.z.update(self.theta, Y)
@@ -438,29 +474,29 @@ class Fa(object):
                     logger.error('%s is not supported' % uo)
                     sys.exit(-1)
 
-    def get_param_dict(self, by_posterior=True):
+    def get_params(self, by_posterior=True):
         '''
-        fa.get_param_dict(by_posterior=True)
+        fa.get_params(by_posterior=True)
         '''
-        dic = self.theta.get_param_dict(by_posterior)
+        dic = self.theta.get_params(by_posterior)
         return dic
 
-    def save_param_dict(self, file_name, by_posterior):
+    def save_params(self, file_name, by_posterior):
         '''
-        fa.save_param_dict(file_name)
+        fa.save_params(file_name)
         @argvs
         file_name: string
         '''
-        dic = self.get_param_dict(by_posterior=True)
+        dic = self.get_params(by_posterior=True)
         dir_name = os.path.dirname(os.path.abspath(file_name))
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
         with open(file_name, 'w') as f:
             pickle.dump(dic, f)
 
-    def load_param_dict(self, file_name):
+    def load_params(self, file_name):
         '''
-        fa.load_param_dict(file_name)
+        fa.load_params(file_name)
         @argvs
         file_name: string
         '''
@@ -474,34 +510,68 @@ class Fa(object):
             logger.error('%s' % e)
         return ret
 
-    def get_samples(self, data_len, by_posterior=True):
+    def samples(self, data_len, by_posterior=True):
         '''
-        y, z, [lamb, prec, cov] = fa.get_samples(data_len, by_posterior=True)
+        y, z, [lamb, prec, cov] = fa.samples(data_len, by_posterior=True)
+
+        Returns
+        y: np.array(data_dim, data_len).
+        z: np.array(aug_dim, data_len).
+        lamb: np.array(aug_dim, data_dim, n_states).
+        prec: np.array(data_dim, data_dim, n_states).
+        cov: np.array(data_dim, data_dim, n_states).
+        * aug_dim = fa_dim + 1
+        * n_states = 1
         '''
-        z = self.z.get_samples(data_len, by_posterior)
-        lamb, prec = self.theta.get_samples(1, by_posterior)
+        z = self.z.samples(data_len, by_posterior)
+        # lamb, prec = self.theta.samples(1, by_posterior)
+        lamb, prec = self.theta.expectations(1, by_posterior)
         y = zeros((self.data_dim, data_len))
         mu = einsum('ld,lt->dt', lamb[:, :, 0], z)
         cov = inv(prec[:, :, 0])
-        for t in xrange(data_len):
+        for t in range(data_len):
             y[:, t] = mvnrnd(mu[:, t], cov)
+        cov = cov[:, :, newaxis]
         return y, z, [lamb, prec, cov]
 
 
-def plotter(y, z, prms, figno=1):
+def plotter(y, z, prms, title, figno=1):
     from numpy import diag
-    from util.plot_models import PlotModels
+    from helpers.plot_models import PlotModels
     l, r, inv_r = prms
     pm = PlotModels(3, 3, figno)
     pm.plot_2d_array((0, 0), l[:-1, :, 0].T, title='$\Lambda$[:-1]')
-    pm.plot_2d_array((0, 1), l[-1, :, 0].T, title='$\Lambda$[-1]')
-    pm.plot_2d_array((0, 2), diag(r[:, :, 0])[:, newaxis], title='R')
+    pm.plot_2d_array((0, 1), l[-1:, :, 0].T, title='$\Lambda$[-1]')
+    pm.plot_2d_array((0, 2), diag(r[:, :, 0])[:, newaxis], title='diag(R)')
     pm.plot_2d_array((1, 0), y, title='Y')
     pm.plot_seq((1, 1), y, title='Y', cspan=2)
     pm.plot_2d_array((2, 0), z, title='Z')
     pm.plot_seq((2, 1), z, title='Z', cspan=2)
     pm.ax.legend(['%d' % x for x in range(z.shape[0])], loc=0)
+    pm.sup_title(title)
     pm.tight_layout()
+    pm.ion_show()
+
+
+def gen_data(fa_dim, data_dim, data_len):
+    fa = Fa(fa_dim, data_dim)
+    fa.set_default_params()
+    # fa.init_z(data_len)
+    Y, Z, prms = fa.samples(data_len)
+    plotter(Y, Z, prms, 'FA data', 1)
+    return Y
+
+
+def update(Y, fa_dim):
+    data_dim, data_len = Y.shape
+    fa = Fa(fa_dim, data_dim)
+    fa.set_default_params()
+    Y, Z, prms = fa.samples(data_len)
+    plotter(Y, Z, prms, 'FA Prior samples', 2)
+    # fa.init_z(data_len)
+    fa.update(Y)
+    Y, Z, prms = fa.samples(data_len)
+    plotter(Y, Z, prms, 'FA posterior samples', 3)
 
 
 def main():
@@ -510,19 +580,12 @@ def main():
     data_dim = 8
     data_len = 1000
     # --- data
-    fa = Fa(fa_dim, data_dim)
-    fa.set_default_params()
-    # fa.init_z(data_len)
-    Y, Z, prms = fa.get_samples(data_len)
-    plotter(Y, Z, prms, 1)
+    Y = gen_data(fa_dim, data_dim, data_len)
     # --- update
-    fa = Fa(fa_dim, data_dim)
-    fa.set_default_params()
-    # fa.init_z(data_len)
-    fa.update(Y)
-    Y, Z, prms = fa.get_samples(data_len)
-    plotter(Y, Z, prms, 2)
-    plt.pause(1)
+    update(Y, fa_dim)
+    plt.ion()
+    plt.show()
+    input('Return to finish')
 
 
 if __name__ == '__main__':

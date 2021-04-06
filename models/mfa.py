@@ -5,7 +5,7 @@ mfa.py
 '''
 import os
 import sys
-import cPickle as pickle
+import pickle
 
 from numpy import pi as np_pi
 from numpy import nan
@@ -28,12 +28,10 @@ from fa import qR as FaR
 cdir = os.path.abspath(os.path.dirname(__file__))
 lib_root = os.path.join(cdir, '..')
 sys.path.append(lib_root)
-from util.logger import logger
-from util.calc_util import inv
-from util.calc_util import logdet
-from util.calc_util import logsumexp
-from distributions.multivariate_normal import MultivariateNormal
-from distributions.gamma import Gamma
+from utils.logger import logger
+from utils.calc_utils import inv
+from utils.calc_utils import logdet
+from utils.calc_utils import logsumexp
 
 
 class qZS(FaZ):
@@ -91,18 +89,18 @@ class qZS(FaZ):
         @argvs
         Y: array(data_dim, data_len)
         lamb.mu: <lamb> array(aug_dim, data_dim)
-        lamb.post.mu2: <lamblambT> array(aug_dim, aug_dim, data_dim)
+        lamb.post.expt2: <lamblambT> array(aug_dim, aug_dim, data_dim)
         r.post.expt: <R> array(data_dim)
         lamb.post.mu: <lamb> array(aug_dim, data_dim)
         '''
         # -- prc
-        rll = einsum('ddk,ljdk->ljk', theta.r.post.expt, theta.lamb.post.mu2)
+        rll = einsum('ddk,ljdk->ljk', theta.r.post.expt, theta.lamb.post.expt2)
         z_prc = self.prior.prec + rll
         # --- cov
         self.z_cov = inv(z_prc.transpose(2, 0, 1)).transpose(1, 2, 0)
         # --- mu
-        ylr = einsum(
-            'dt,ldk,ddk->lkt', Y, theta.lamb.post.mu, theta.r.post.expt)
+        ylr = einsum('dt,ldk,ddk->lkt', Y, theta.lamb.post.mu,
+                     theta.r.post.expt)
         ylr_zmu = ylr + self.prior.expt_prec_mu[:, :, newaxis]
         self.z_mu = einsum('ljk,jkt->lkt', self.z_cov, ylr_zmu)
         # --- update s
@@ -112,9 +110,9 @@ class qZS(FaZ):
         # --- expectations
         self.set_expt(self.s.expt, self.z_mu, self.z_cov)
 
-    def get_samples(self, data_len, pi=None, by_posterior=True):
+    def samples(self, data_len, pi=None, by_posterior=True):
         '''
-        zs.get_samples(data_len, pi=None, by_postrior=True)
+        zs.samples(data_len, pi=None, by_postrior=True)
         @argvs
         data_len: data length
         pi: array(n_states), probability, sum must be 1
@@ -124,7 +122,7 @@ class qZS(FaZ):
         s: array(n_states, data_len)
         '''
         # --- sample S
-        s = self.s.get_samples(data_len, pi)
+        s = self.s.samples(data_len, pi)
         # --- sample Z
         if by_posterior:
             z = ones((self.aug_dim, self.n_states, data_len)) * nan
@@ -132,14 +130,14 @@ class qZS(FaZ):
             z[-1, :, :] = 1
             mu_len = 0 if self.z_mu is None else self.z_mu.shape[-1]
             t_max = data_len if data_len < mu_len else mu_len
-            for t in xrange(t_max):
+            for t in range(t_max):
                 k = s[t]
                 z[:, k, t] = mvnrnd(self.z_mu[:, k, t], self.z_cov[:, :, k])
             t_rest = data_len - t_max
             if t_rest > 0:
-                z[:, :, t_max:] = self.prior.sample(t_rest).transpose(1, 2, 0)
+                z[:, :, t_max:] = self.prior.samples(t_rest).transpose(1, 2, 0)
         else:
-            z = self.prior.sample(data_len)[:, :, 0].T
+            z = self.prior.samples(data_len)[:, :, 0].T
         return z, s
 
 
@@ -193,7 +191,7 @@ class qLamb(FaLamb):
         mu: <Lamb> (aug_dim, data_dim, n_states)
         cov: cov<Lamb> (aug_dim, aug_dim, data_dim, n_states)
         prc: inv(cov<Lamb>) (aug_dim, aug_dim, data_dim, n_states)
-        mu2: <LambLamb'> = <Lamb><Lamb>'+ cov
+        expt2: <LambLamb'> = <Lamb><Lamb>'+ cov
         '''
         super(qLamb, self).__init__(fa_dim, data_dim, False)
         self.n_states = n_states
@@ -217,11 +215,11 @@ class qLamb(FaLamb):
         mu = einsum('ijdk,jdk->idk', cov, pm_rysz)
         self.post.set_params(mu=mu, cov=cov, prc=prc)
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         if by_posterior:
-            m = self.post.sample(data_len)
+            m = self.post.samples(data_len)
         else:
-            m = self.prior.sample(data_len)
+            m = self.prior.samples(data_len)
         return m
 
 
@@ -257,15 +255,15 @@ class qR(FaR):
         a = self.prior.a + 0.5 * einsum('kt->k', s)
         # --- b
         yszl = einsum('dlk,ldk->dk', sum_ysz, lamb.post.mu)
-        tr_szzll = einsum('ljk,ljdk->dk', sum_szz, lamb.post.mu2)
+        tr_szzll = einsum('ljk,ljdk->dk', sum_szz, lamb.post.expt2)
         b = self.prior.b + 0.5 * (sum_yys - 2.0 * yszl + tr_szzll)
         self.post.set_params(a=a, b=b)
 
-    def get_samples(self, data_len=1, by_posterior=True):
+    def samples(self, data_len=1, by_posterior=True):
         if by_posterior:
-            r = self.post.sample(data_len)
+            r = self.post.samples(data_len)
         else:
-            r = self.prior.sample(data_len)
+            r = self.prior.samples(data_len)
         r = einsum('dk,de->dek', r, eye(self.data_dim))
         return r
 
@@ -384,10 +382,10 @@ class Theta(object):
         }
         return dst
 
-    def get_samples(self, data_len=1, by_posterior=True):
-        l = self.lamb.get_samples(data_len, by_posterior)
-        r = self.r.get_samples(data_len, by_posterior)
-        pi = self.pi.get_samples(data_len, by_posterior)
+    def samples(self, data_len=1, by_posterior=True):
+        l = self.lamb.samples(data_len, by_posterior)
+        r = self.r.samples(data_len, by_posterior)
+        pi = self.pi.samples(data_len, by_posterior)
         return l, r, pi
 
 
@@ -404,15 +402,12 @@ class Mfa:
         self.fa_dim = fa_dim
         self.aug_dim = fa_dim + 1
         self.n_states = n_states
+        self.update_order = args.get('update_order', ['E', 'M'])
+        self._expt_init_mode = args.get('expt_init_mode', 'random')
+
         # --- theta and zs
         self.zs = qZS(fa_dim, n_states)
         self.theta = Theta(self.fa_dim, self.data_dim, self.n_states)
-        # --- update setting
-        self.max_itr = args.get('max_itr', 100)
-        self.update_order = [
-            'Theta',
-            'ZS',
-        ]
 
     def init_zs(self, data_len):
         self.zs.init_expt(data_len)
@@ -443,20 +438,21 @@ class Mfa:
         '''
         self.theta.set_params(prm)
 
-    def update(self, Y):
+    def update(self, Y, max_em_itr):
         '''
         mfa.update()
         @argvs
         Y: np.array(data_dim, data_len)
         '''
-        logger.info(
-            'update order %s, in Theta %s' %
-            (self.update_order, self.theta.update_order))
-        for i in xrange(self.max_itr):
+        logger.info('update order %s, in Theta %s' % (self.update_order,
+                                                      self.theta.update_order))
+        ibgn = 0
+        iend = max_em_itr
+        for i in range(ibgn, iend):
             for j, uo in enumerate(self.update_order):
-                if uo == 'ZS':
+                if uo == 'E':
                     self.zs.update(Y, self.theta)
-                elif uo == 'Theta':
+                elif uo == 'M':
                     self.theta.update(Y, self.zs)
                 else:
                     logger.error('%s is not supported' % uo)
@@ -498,12 +494,12 @@ class Mfa:
             logger.error('%s' % e)
         return ret
 
-    def get_samples(self, data_len, by_posterior=True):
-        lamb, r, pi = self.theta.get_samples(by_posterior=by_posterior)
-        z, s = self.zs.get_samples(data_len, pi, by_posterior)
+    def samples(self, data_len, by_posterior=True):
+        lamb, r, pi = self.theta.samples(by_posterior=by_posterior)
+        z, s = self.zs.samples(data_len, pi, by_posterior)
         y = ones((self.data_dim, data_len)) * nan
         inv_r = inv(r.transpose(2, 0, 1)).transpose(1, 2, 0)
-        for t in xrange(data_len):
+        for t in range(data_len):
             k = s[t]
             mu = einsum('ld,l->d', lamb[:, :, k], z[:, k, t])
             cov = inv_r[:, :, k]
@@ -511,20 +507,20 @@ class Mfa:
         return y, z, s, [lamb, r, inv_r, pi]
 
 
-def plotter(y, z, s, prms, figno=1):
+def plotter(y, z, s, prms, title, figno):
     from numpy import diag
     from numpy import array as arr
-    from util.plot_models import PlotModels
+    from helpers.plot_models import PlotModels
     l, r, inv_r, pi = prms
     aug_dim, dat_dim, n_states = l.shape
     n_cols = aug_dim + 1
     pm = PlotModels(3, n_cols, figno)
     # --- Lambda
-    for i in xrange(aug_dim):
+    for i in range(aug_dim):
         pm.plot_2d_array((0, i), l[i, :, :], title='$\Lambda$[%d]' % i)
         pm.ax.legend(['%d' % x for x in range(n_states)], loc=0)
     # --- R
-    tmp = arr([diag(r[:, :, i]) for i in xrange(n_states)]).T
+    tmp = arr([diag(r[:, :, i]) for i in range(n_states)]).T
     pm.plot_2d_array((0, n_cols - 1), tmp, title='R')
     pm.ax.legend(['%d' % x for x in range(n_states)], loc=0)
     # --- Y
@@ -532,10 +528,35 @@ def plotter(y, z, s, prms, figno=1):
     pm.plot_seq((1, 1), y, cat=s, title='Y', cspan=n_cols - 1)
     # --- Z
     data_len = z.shape[-1]
-    zs = arr([z[:, s[t], t] for t in xrange(data_len)]).T
+    zs = arr([z[:, s[t], t] for t in range(data_len)]).T
     pm.plot_2d_array((2, 0), zs, title='Z')
     pm.plot_seq((2, 1), zs, cat=s, title='Z', cspan=n_cols - 1)
     pm.ax.legend(['%d' % x for x in range(z.shape[0])], loc=0)
+    # ---
+    pm.sup_title(title)
+    pm.tight_layout()
+
+
+def gen_data(fa_dim, data_dim, data_len, n_states):
+    mfa = Mfa(fa_dim, data_dim, n_states)
+    mfa.set_default_params()
+    mfa.init_zs(data_len)
+    Y, Z, S, prms = mfa.samples(data_len)
+    plotter(Y, Z, S, prms, 'MFA Data', 1)
+    return Y
+
+
+def update(Y, fa_dim, n_states):
+    data_dim, data_len = Y.shape
+    mfa = Mfa(fa_dim, data_dim, n_states)
+    mfa.set_default_params()
+    # --- prior samples
+    Y, Z, S, prms = mfa.samples(data_len)
+    plotter(Y, Z, S, prms, 'MFA Prior', 2)
+    mfa.update(Y, 100)
+    # --- posterior samples
+    Y, Z, S, prms = mfa.samples(data_len)
+    plotter(Y, Z, S, prms, 'MFA posterior sample', 3)
 
 
 def main():
@@ -545,18 +566,13 @@ def main():
     n_states = 3
     data_len = 1000
     # --- data
-    mfa = Mfa(fa_dim, data_dim, n_states)
-    mfa.set_default_params()
-    mfa.init_zs(data_len)
-    Y, Z, S, prms = mfa.get_samples(data_len)
-    plotter(Y, Z, S, prms, 1)
+    Y = gen_data(fa_dim, data_dim, data_len, n_states)
     # --- update
-    mfa = Mfa(fa_dim, data_dim, n_states)
-    mfa.set_default_params()
-    mfa.update(Y)
-    Y, Z, S, prms = mfa.get_samples(data_len)
-    plotter(Y, Z, S, prms, 2)
+    update(Y, fa_dim, n_states)
+    # ---
+    plt.ion()
     plt.show()
+    input('Return to finish')
 
 
 if __name__ == '__main__':
