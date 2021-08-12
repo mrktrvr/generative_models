@@ -20,14 +20,14 @@ from gmm import qPi as GmmPi
 from gmm import qS as GmmS
 from forward_backward import ForwardBackward
 from model_util import CheckTools
+from model_util import init_expt
 
 cdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(cdir, '..'))
 from distributions.dirichlet import Dirichlet
 from distributions.kl_divergence import KL_Dir
-from utils.calc_utils import inv
-from utils.logger import logger
-from model_util import init_expt
+from ml_utils.calc_utils import inv
+from python_utilities.utils.logger import logger
 
 
 class qPi(GmmPi):
@@ -183,9 +183,9 @@ class Theta(GmmTheta):
         A = self.qA.expectations(by_posterior)
         return mu, R, pi, A
 
-    def get_param_dict(self, by_posterior=True):
+    def get_params(self, by_posterior=True):
         '''
-        theta.get_param_dict(by_posterior=True)
+        theta.get_params(by_posterior=True)
         @argvs
         by_posterior: use posterior params(True) or not(False)
         @return
@@ -209,16 +209,16 @@ class Theta(GmmTheta):
         }
         '''
         dst = {
-            'MuR': self.qmur.get_param_dict(by_posterior),
-            'Pi': self.qpi.get_param_dict(by_posterior),
-            'A': self.qA.get_param_dict(by_posterior),
+            'MuR': self.qmur.get_params(by_posterior),
+            'Pi': self.qpi.get_params(by_posterior),
+            'A': self.qA.get_params(by_posterior),
             'n_states': self.n_states,
             'data_dim': self.data_dim,
         }
         return dst
 
-    def save_param_dict(self, file_name, by_posterior=True):
-        prm = self.get_param_dict(by_posterior)
+    def save_params(self, file_name, by_posterior=True):
+        prm = self.get_params(by_posterior)
         try:
             with open(file_name, 'w') as f:
                 pickle.dump(prm, f)
@@ -227,7 +227,7 @@ class Theta(GmmTheta):
             logger.warning(exception)
             return False
 
-    def load_param_dict(self, file_name):
+    def load_params(self, file_name):
         if os.path.exists(file_name):
             with open(file_name, 'r') as f:
                 prm = pickle.load(f)
@@ -304,6 +304,16 @@ class qS(GmmS):
         self.expt = s
         self.expt2 = ss
         self.const = c
+
+    def estimate(self, Y, theta):
+        logger.debug('calc ln_lkh')
+        ln_obs_lkh = theta.qmur.calc_ln_lkh(Y, None)
+        logger.debug('forward backward')
+        lns, lnss, c = ForwardBackward()(ln_obs_lkh, theta.qpi.post.expt_ln,
+                                         theta.qA.post.expt_ln)
+        expt = exp(lns)
+        s = expt.argmax(0)
+        return s
 
     def samples(self, data_len, pi, A):
         '''
@@ -438,8 +448,8 @@ class Hmm(CheckTools):
     def _update_vb(self, i):
         self.vbs[i] = self.calc_vb()
         if not self.check_vb_increase(self.vbs, i):
-            logger.warning('vb increased')
-            dst = True
+            logger.warning('vb decreased')
+            dst = False
         else:
             if self.is_conversed(self.vbs, i, self._vb_th_to_stop_itr):
                 dst = True
@@ -482,14 +492,14 @@ class Hmm(CheckTools):
             Y[:, t] = mvnrand(mu[:, k], cov)
         return Y, S, [mu, R, pi, A]
 
-    def get_estims(self, Y=None, use_sample=False):
+    def estimate(self, Y=None, use_sample=False):
         '''
         return
         estim_y: (data_dim, data_len), waveform sequence
         estim_s: (data_len), state sequence which contains 0 to n_states - 1
         vb: float value, valiational bound
         '''
-        estim_s = self.qs.get_estims(Y, self.theta, True)
+        estim_s = self.qs.estimate(Y, self.theta)
         estim_y = zeros((self.data_dim, len(estim_s)))
         if use_sample:
             for k in range(self.n_states):
@@ -508,7 +518,7 @@ class Hmm(CheckTools):
         vb = self.calc_vb()
         return estim_y, estim_s, vb
 
-    def get_param_dict(self, by_posterior=True):
+    def get_params(self, by_posterior=True):
         '''
         dst = {
         'MuR': {
@@ -529,17 +539,17 @@ class Hmm(CheckTools):
         'data_dim': int,
         }
         '''
-        dst = self.theta.get_param_dict(by_posterior)
+        dst = self.theta.get_params(by_posterior)
         # self.data_dim = dst['data_dim']
         return dst
 
     def save_params(self, file_name):
-        was_saved = self.theta.save_param_dict(file_name)
+        was_saved = self.theta.save_params(file_name)
         logger.info('saved %s' % file_name)
         return was_saved
 
     def load_params(self, file_name):
-        was_loaded = self.theta.load_param_dict(file_name)
+        was_loaded = self.theta.load_params(file_name)
         self.data_dim = self.theta.data_dim
         self.n_states = self.theta.n_states
         return was_loaded
@@ -553,54 +563,54 @@ class Hmm(CheckTools):
         return dst
 
 
-def plotter(y, s, hmm, sup_title, figno):
-    daat_dim, data_len = y.shape
-    # --- sample
-    if False:
-        _, _, prm = hmm.samples(data_len)
-        vbs = hmm.vbs
-        cur_figno = 100 * figno + 1
-        _plotter_core(y, s, prm, vbs, 'sample', sup_title, cur_figno)
-    # --- expectation
-    if True:
-        prm = [
-            hmm.theta.qmur.post.mu,
-            hmm.theta.qmur.post.expt_prec,
-            hmm.theta.qpi.post.expt,
-            hmm.theta.qA.post.expt,
-        ]
-        vbs = hmm.vbs
-        cur_figno = 100 * figno + 2
-        _plotter_core(y, s, prm, vbs, 'expextation', sup_title, cur_figno)
+# def plotter(y, s, hmm, sup_title, figno):
+#     daat_dim, data_len = y.shape
+#     # --- sample
+#     if False:
+#         _, _, prm = hmm.samples(data_len)
+#         vbs = hmm.vbs
+#         cur_figno = 100 * figno + 1
+#         _plotter_core(y, s, prm, vbs, 'sample', sup_title, cur_figno)
+#     # --- expectation
+#     if True:
+#         prm = [
+#             hmm.theta.qmur.post.mu,
+#             hmm.theta.qmur.post.expt_prec,
+#             hmm.theta.qpi.post.expt,
+#             hmm.theta.qA.post.expt,
+#         ]
+#         vbs = hmm.vbs
+#         cur_figno = 100 * figno + 2
+#         _plotter_core(y, s, prm, vbs, 'expextation', sup_title, cur_figno)
+#
 
-
-def _plotter_core(y, s, prm, vbs, prm_type_str, sup_title, figno):
-    from helpers.plot_models import PlotModels
-    mu, r, pi, A = prm
-    n_cols = 3
-    pm = PlotModels(3, n_cols, figno)
-    # --- Mu
-    pm.plot_2d_array((0, 0), mu, title=r'$\mu$ %s' % prm_type_str)
-    # --- Pi
-    pm.multi_bar((0, 1), atleast_2d(pi), title=r'$\pi$ %s' % prm_type_str)
-    # --- A
-    pm.plot_table((0, 2), A, title='Transition probabilities')
-    # --- Obs(data_dim v amplitude)
-    pm.plot_2d_array((1, 0), y, title='Y')
-    # --- Mu and obs
-    cov = inv(r.transpose(2, 0, 1)).transpose(1, 2, 0)
-    pm.plot_2d_mu_cov((1, 1), mu, cov, src=y, cat=s)
-    # --- Variational bound
-    pm.plot_vb((1, 2), vbs, cspan=1)
-    # --- Obs(sequence)
-    pm.plot_seq((2, 0), y, cat=s, title='Y', cspan=n_cols)
-    # ---
-    pm.sup_title(sup_title)
-    pm.tight_layout()
+# def _plotter_core(y, s, prm, vbs, prm_type_str, sup_title, figno):
+#     from helpers.plot_models import PlotModels
+#     mu, r, pi, A = prm
+#     n_cols = 3
+#     pm = PlotModels(3, n_cols, figno)
+#     # --- Mu
+#     pm.plot_2d_array((0, 0), mu, title=r'$\mu$ %s' % prm_type_str)
+#     # --- Pi
+#     pm.multi_bar((0, 1), atleast_2d(pi), title=r'$\pi$ %s' % prm_type_str)
+#     # --- A
+#     pm.plot_table((0, 2), A, title='Transition probabilities')
+#     # --- Obs(data_dim v amplitude)
+#     pm.plot_2d_array((1, 0), y, title='Y')
+#     # --- Mu and obs
+#     cov = inv(r.transpose(2, 0, 1)).transpose(1, 2, 0)
+#     pm.plot_2d_mu_cov((1, 1), mu, cov, src=y, cat=s)
+#     # --- Variational bound
+#     pm.plot_vb((1, 2), vbs, cspan=1)
+#     # --- Obs(sequence)
+#     pm.plot_seq((2, 0), y, cat=s, title='Y', cspan=n_cols)
+#     # ---
+#     pm.sup_title(sup_title)
+#     pm.tight_layout()
 
 
 def gen_data(data_dim, n_states, data_len):
-    from utils.calc_utils import rand_wishart
+    from ml_utils.calc_utils import rand_wishart
     from numpy.random import seed
     seed(1)
     hmm = Hmm(data_dim, n_states, expt_init_mode='random')
@@ -616,7 +626,7 @@ def gen_data(data_dim, n_states, data_len):
     hmm.set_params({'MuR': {'mu': mu, 'W': W}})
     y, s, _ = hmm.samples(data_len)
     # --- plotter
-    plotter(y, s, hmm, 'HMM data', 1)
+    # plotter(y, s, hmm, 'HMM data', 1)
     return y
 
 
@@ -635,12 +645,12 @@ def update(y, n_states):
     hmm.init_expt_s(data_len, y)
     # --- plotter
     s = hmm.expt_s.argmax(0)
-    plotter(y, s, hmm, 'HMM prior', 2)
+    # plotter(y, s, hmm, 'HMM prior', 2)
     # --- update
     hmm.update(y, 100)
     # --- plotter
     s = hmm.expt_s.argmax(0)
-    plotter(y, s, hmm, 'HMM posterior', 3)
+    # plotter(y, s, hmm, 'HMM posterior', 3)
 
 
 def main():

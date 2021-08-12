@@ -19,19 +19,21 @@ from numpy import tile
 from numpy import einsum
 from numpy.random import multivariate_normal as mvnrnd
 
+CDIR = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.append(CDIR)
 from gmm import qPi
 from gmm import qS as GmmS
 from fa import qZ as FaZ
 from fa import qLamb as FaLamb
 from fa import qR as FaR
 
-cdir = os.path.abspath(os.path.dirname(__file__))
-lib_root = os.path.join(cdir, '..')
-sys.path.append(lib_root)
-from utils.logger import logger
-from utils.calc_utils import inv
-from utils.calc_utils import logdet
-from utils.calc_utils import logsumexp
+LIB_ROOT = os.path.join(CDIR, '..')
+sys.path.append(LIB_ROOT)
+from python_utilities.utils.logger import logger
+from ml_utils.calc_utils import inv
+from ml_utils.calc_utils import logdet
+from ml_utils.calc_utils import logsumexp
 
 
 class qZS(FaZ):
@@ -44,11 +46,11 @@ class qZS(FaZ):
     expt_szz: array(aug_dim, aug_dim, n_states, data_len)
     '''
 
-    def __init__(self, fa_dim, n_states):
+    def __init__(self, fa_dim, n_states, **args):
         super(qZS, self).__init__(fa_dim)
         self.n_states = n_states
         # ---
-        self.s = qS(n_states)
+        self.s = qS(n_states, **args)
         # --- prior of z
         self.prior = None
         self.set_default_priors()
@@ -60,11 +62,13 @@ class qZS(FaZ):
         self.expt_sz = None
         self.expt_szz = None
 
-    def init_expt(self, data_len):
+    def init_expt(self, data_len, obs=None):
         '''
         zs.init_expt(data_len)
         '''
-        self.s.init_expt(data_len)
+        if self.expt_s is not None:
+            return
+        self.s.init_expt(data_len, obs)
         m, c = self.prior.mu[:, 0], self.prior.cov[:, :, 0]
         n_states = self.n_states
         self.z_mu = mvnrnd(m, c, size=(data_len, n_states)).transpose(2, 1, 0)
@@ -147,8 +151,8 @@ class qS(GmmS):
     expt: array(n_states, data_len)
     '''
 
-    def __init__(self, n_states):
-        super(qS, self).__init__(n_states)
+    def __init__(self, n_states, **args):
+        super(qS, self).__init__(n_states, **args)
 
     def update(self, Y, theta, z_prior, zs_mpm, zs_cov_lndet):
         '''
@@ -257,6 +261,14 @@ class qR(FaR):
         yszl = einsum('dlk,ldk->dk', sum_ysz, lamb.post.mu)
         tr_szzll = einsum('ljk,ljdk->dk', sum_szz, lamb.post.expt2)
         b = self.prior.b + 0.5 * (sum_yys - 2.0 * yszl + tr_szzll)
+        import numpy as np
+        with np.errstate(invalid='raise'):
+            try:
+                logb = log(b)
+            except Exception as e:
+                print(e)
+                from IPython import embed
+                embed(header='logb')
         self.post.set_params(a=a, b=b)
 
     def samples(self, data_len=1, by_posterior=True):
@@ -346,12 +358,11 @@ class Theta(object):
         Y: np.array(data_dim, data_len)
         zs: qZS class object
         '''
-        if zs.mu is None:
-            zs.init_expt(Y.shape[-1])
+        zs.init_expt(Y.shape[-1], Y)
         s = zs.s.expt
         sum_szz = einsum('ljkt->ljk', zs.expt_szz)
         sum_ysz = einsum('dt,lkt->dlk', Y, zs.expt_sz)
-        sum_yys = einsum('dt,dt,kt->dk', Y, Y, zs.s.expt)
+        sum_yys = einsum('dt,dt,kt->dk', Y, Y, s)
         for uo in self.update_order:
             if uo == 'Lamb':
                 self.lamb.update(self.r, sum_szz, sum_ysz)
@@ -383,10 +394,16 @@ class Theta(object):
         return dst
 
     def samples(self, data_len=1, by_posterior=True):
-        l = self.lamb.samples(data_len, by_posterior)
+        try:
+            lamb = self.lamb.samples(data_len, by_posterior)
+        except Exception as e:
+            print(e)
+            from IPython import embed
+            embed(header='sample')
+
         r = self.r.samples(data_len, by_posterior)
         pi = self.pi.samples(data_len, by_posterior)
-        return l, r, pi
+        return lamb, r, pi
 
 
 class Mfa:
@@ -404,13 +421,22 @@ class Mfa:
         self.n_states = n_states
         self.update_order = args.get('update_order', ['E', 'M'])
         self._expt_init_mode = args.get('expt_init_mode', 'random')
+        logger.info('\n'.join([
+            '',
+            '%10s: %2d' % ('data_dim', self.data_dim),
+            '%10s: %2d' % ('fa_dim', self.fa_dim),
+            '%10s: %2d' % ('aug_dim', self.aug_dim),
+            '%10s: %2d' % ('n_states', self.n_states),
+            '%10s: %s' % ('update', self.update_order),
+            '%10s: %s' % ('init_mode', self._expt_init_mode),
+        ]))
 
         # --- theta and zs
-        self.zs = qZS(fa_dim, n_states)
+        self.zs = qZS(fa_dim, n_states, expt_init_mode=self._expt_init_mode)
         self.theta = Theta(self.fa_dim, self.data_dim, self.n_states)
 
-    def init_zs(self, data_len):
-        self.zs.init_expt(data_len)
+    def init_zs(self, data_len, obs=None):
+        self.zs.init_expt(data_len, obs=None)
 
     def set_default_params(self):
         self.theta.set_default_params()
@@ -450,6 +476,8 @@ class Mfa:
         iend = max_em_itr
         for i in range(ibgn, iend):
             for j, uo in enumerate(self.update_order):
+                if i % 10 == 0:
+                    logger.info('iteration %3d (%s)' % (i, uo))
                 if uo == 'E':
                     self.zs.update(Y, self.theta)
                 elif uo == 'M':
@@ -510,7 +538,7 @@ class Mfa:
 def plotter(y, z, s, prms, title, figno):
     from numpy import diag
     from numpy import array as arr
-    from helpers.plot_models import PlotModels
+    from ml_utils.plot_models import PlotModels
     l, r, inv_r, pi = prms
     aug_dim, dat_dim, n_states = l.shape
     n_cols = aug_dim + 1
@@ -542,21 +570,30 @@ def gen_data(fa_dim, data_dim, data_len, n_states):
     mfa.set_default_params()
     mfa.init_zs(data_len)
     Y, Z, S, prms = mfa.samples(data_len)
-    plotter(Y, Z, S, prms, 'MFA Data', 1)
+    # plotter(Y, Z, S, prms, 'MFA Data', 1)
     return Y
 
 
-def update(Y, fa_dim, n_states):
-    data_dim, data_len = Y.shape
-    mfa = Mfa(fa_dim, data_dim, n_states)
+def update(Y_obs, fa_dim, n_states):
+    data_dim, data_len = Y_obs.shape
+    mfa = Mfa(
+        fa_dim,
+        data_dim,
+        n_states,
+        update_order=['M', 'E'],
+        expt_init_mode='kmeans')
     mfa.set_default_params()
+
     # --- prior samples
-    Y, Z, S, prms = mfa.samples(data_len)
-    plotter(Y, Z, S, prms, 'MFA Prior', 2)
-    mfa.update(Y, 100)
+    Y_prior, Z_prior, S_prior, prms_prior = mfa.samples(data_len)
+    # plotter(Y_prior, Z_prior, S_prior, prms_prior, 'MFA Prior', 2)
+
+    # --- update
+    mfa.update(Y_obs, 100)
+
     # --- posterior samples
-    Y, Z, S, prms = mfa.samples(data_len)
-    plotter(Y, Z, S, prms, 'MFA posterior sample', 3)
+    Y_post, Z_post, S_post, prms_post = mfa.samples(data_len)
+    plotter(Y_post, Z_post, S_post, prms_post, 'MFA posterior sample', 3)
 
 
 def main():

@@ -12,6 +12,10 @@ from numpy import newaxis
 from numpy import zeros
 from numpy import ones
 from numpy import array as arr
+from numpy import linspace
+from numpy import round as nround
+from numpy import ceil as nceil
+from numpy import floor as nfloor
 from numpy import einsum
 from numpy import exp
 from numpy import log
@@ -22,17 +26,19 @@ from numpy import tile
 from numpy.random import choice
 from numpy.random import dirichlet
 
+cdir = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(cdir)
+
 from gmm import qS as gmm_qs
 from gmm import qPi as gmm_qpi
 from model_util import CheckTools
 from default_model_params import DefaultLdaParams
 
-cdir = os.path.abspath(os.path.dirname(__file__))
-
 sys.path.append(os.path.join(cdir, '..'))
+
 from distributions.dirichlet import Dirichlet
-from utils.calc_utils import logsumexp
-from utils.logger import logger
+from ml_utils.calc_utils import logsumexp
+from python_utilities.utils.logger import logger
 
 
 def idx_seq_to_full_array(src, n_states):
@@ -50,15 +56,15 @@ def idx_seq_to_full_array(src, n_states):
 def calc_tf_idf(s_list, n_states):
     '''
     @argv
-    s_list: list of HMM states
-    n_staets: number of states of HMM
+    s_list: list of states
+    n_states: number of states
     @return
     tfidf: np.array(n_states, len(s_list))
     tf: np.array(n_states, len(s_list))
     idf: np.array(n_states)
     '''
-    n_state_in_batch = arr(
-        [[len(s[s == k]) for k in range(n_states)] for s in s_list])
+    n_state_in_batch = arr([[len(s[s == k]) for k in range(n_states)]
+                            for s in s_list])
     n_in_batch = arr([len(s) for s in s_list], dtype=float)
     tf = n_state_in_batch / n_in_batch[:, newaxis]
     tf = tf.T
@@ -77,7 +83,6 @@ class qPi(object):
     '''
     qpi = qPi(n_states, n_cat)
     '''
-
     def __init__(self, n_states, n_cat):
         '''
         qpi = qPi(n_states, n_cat)
@@ -93,11 +98,19 @@ class qPi(object):
         qpi.set_default_params()
         '''
         alpha = DefaultLdaParams().Pi(self.n_states, self.n_cat)
+        a = 1000
+        for k, v in enumerate(linspace(0, self.n_cat - 1, self.n_states)):
+            f = int(nfloor(v))
+            c = int(nceil(v))
+            r = v - f
+            alpha[k, f] += a * (1 - r)
+            if k != self.n_states - 1:
+                alpha[k, c] += a * r
         self.set_params(alpha=alpha)
 
     def set_params(self, alpha, ln_alpha=None):
         '''
-        qpi.set_params(**argvs)
+        qpi.set_params(alpha, ln_alpha=None)
         @argvs
         'alpha': np.array(n_states, n_cat)
         'ln_alpha': np.array(n_states, n_cat)
@@ -172,6 +185,7 @@ class qPhi(gmm_qpi):
         '''
         super(qPhi, self).__init__(n_cat)
         self.n_cat = n_cat
+        self.set_default_params()
 
     def set_default_params(self):
         alpha = DefaultLdaParams().Phi(self.n_cat)
@@ -194,7 +208,6 @@ class qZ(gmm_qs):
     '''
     qz = qZ(n_cat)
     '''
-
     def __init__(self, n_cat):
         '''
         qz = qz(n_cat)
@@ -235,7 +248,7 @@ class qZ(gmm_qs):
         @self
         expt: (n_states, data_lem)
         '''
-        alpha_pi = ones(self.n_states)
+        alpha_pi = ones(self.n_cat)
         expt = dirichlet(alpha_pi, size=data_len).T
         self.set_expt(expt)
 
@@ -253,9 +266,9 @@ class qZ(gmm_qs):
             z[t] = choice(self.n_cat, p=phi)
         return z
 
-    def get_estims(self):
+    def estimate(self):
         '''
-        qz.get_estims()
+        qz.estimate()
         '''
         pass
 
@@ -263,7 +276,6 @@ class qZ(gmm_qs):
 class Lda(CheckTools):
     '''
     '''
-
     def __init__(self, n_states, n_cat, **argvs):
         '''
         n_states: number of states, int
@@ -273,14 +285,14 @@ class Lda(CheckTools):
         self.n_states = n_states
         self.n_cat = n_cat
         self.tfidf = argvs.get('tfidf', None)
+        self.em_order = argvs.get('em_order', ['Z', 'Phi', 'Pi'])
+        # self.em_order = argvs.get('em_order', ['Pi', 'Phi', 'Z'])
+        # self.em_order = argvs.get('em_order', ['Z', 'Pi', 'Phi'])
+
         # --- distributions
         self.qpi = qPi(n_states, n_cat)
         self.qphi_list = None
         self.qz_list = None
-        # --- update setting
-        self.update_order_lda = ['Pi', 'Phi', 'Z']
-        # self.update_order_lda = ['Z', 'Pi', 'Phi']
-        # self.update_order_lda = ['Z', 'Phi', 'Pi']
 
     def init_qphi_qz(self, n_batches):
         self.init_qphi(n_batches)
@@ -313,11 +325,36 @@ class Lda(CheckTools):
     def set_params(self, prms):
         if 'Pi' in prms:
             self.qpi.set_params(**prms['Pi'])
+            self.n_states = self.qpi.n_states
+            self.n_cat = self.qpi.n_cat
         if 'Phi' in prms:
             n_batches = len(prms['Phi'])
             self.init_qphi(n_batches)
             for b, p in enumerate(prms['Phi']):
                 self.qphi_list[b].set_params(**p)
+        else:
+            self.init_qphi(1)
+
+    def set_expts(self, expt_phis, expt_z_list, expt_pi):
+        self.set_expt_phis(expt_phis)
+        self.set_expt_z_list(expt_z_list)
+        self.set_expt_pi(expt_pi)
+
+    def set_expt_phis(self, expt_phis):
+        n_batches = len(expt_phis)
+        self.init_qphi(n_batches)
+        for b, expt_phi in enumerate(expt_phis):
+            self.qphi_list[b].prior.expt = expt_phi
+            self.qphi_list[b].post.expt = expt_phi
+
+    def set_expt_z_list(self, expt_z_list):
+        n_batches = len(expt_z_list)
+        self.init_qz(n_batches)
+        for b, expt_z in enumerate(expt_z_list):
+            self.qz_list[b].expt = expt_z
+
+    def set_expt_pi(self, expt_pi):
+        self.qpi.post.expt = expt_pi
 
     def _print_params(self, i, tar_list=['Phi', 'Z', 'Pi']):
         print('--- itr %d %s' % (i, tar_list))
@@ -352,20 +389,26 @@ class Lda(CheckTools):
         n_batches = len(s_list)
         self.init_qphi_qz(n_batches)
         # self._print_params(-1)
-        self._update_core(s_list, self.update_order_lda, max_em_itr)
+        self._update_core(s_list, self.em_order, max_em_itr)
 
-    def predict(self, s_list, n_itr=1):
+    def infer(self, s_list, n_itr=100):
         n_batches = len(s_list)
         self.init_qphi_qz(n_batches)
-        update_order = ['Z', 'Phi', 'Pi']
-        self._update_core(s_list, update_order, n_itr)
+        em_order = ['Z', 'Phi']
+        self._update_core(s_list, em_order, n_itr)
 
-    def _update_core(self, s_list, update_order, n_itr):
-        logger.info('order:%s, itr: %d' % (update_order, n_itr))
+    def predict(self, s_list, n_itr=100):
+        self.infer(s_list, n_itr)
+        expt_z_list = [x.expt for x in self.qz_list]
+        expt_phis = arr([x.post.expt for x in self.qphi_list])
+        return expt_phis, expt_z_list
+
+    def _update_core(self, s_list, em_order, n_itr):
+        # logger.debug('order:%s, itr: %d' % (em_order, n_itr))
         for i in range(n_itr):
-            if i % 10 == 0:
-                logger.info('itr %3d of %3d' % (i, n_itr))
-            for uo in update_order:
+            # if (i + 1) % 100 == 0 or i == 0:
+            #     logger.debug('itr %3d of %3d' % (i + 1, n_itr))
+            for uo in em_order:
                 if uo == 'Phi':
                     for b in range(len(self.qphi_list)):
                         self.qphi_list[b].update(self.qz_list[b].expt)
@@ -379,6 +422,18 @@ class Lda(CheckTools):
                     self.qpi.update(s, z)
                 else:
                     raise Exception('update order %s does not exist' % uo)
+
+    def expt_phis(self):
+        expt_phis = arr([x.post.expt for x in self.qphi_list])
+        return expt_phis
+
+    def expt_z_list(self):
+        expt_z_list = [x.expt for x in self.qz_list]
+        return expt_z_list
+
+    def expt_pi(self):
+        expt_pi = self.qpi.post.expt
+        return expt_pi
 
     def samples(self, data_len_list, by_posterior=True):
         '''
@@ -401,7 +456,7 @@ class Lda(CheckTools):
         prms = [pi, phi]
         return s, z, prms
 
-    def get_estims(self):
+    def estimate(self):
         z_expt = [x.expt for x in self.qz_list]
         phi_expt = arr([x.post.expt for x in self.qphi_list])
         pi_expt = self.qpi.post.expt
@@ -432,8 +487,9 @@ class Lda(CheckTools):
     def save_params(self, file_name, by_posterior=True):
         prm = self.get_params(by_posterior)
         try:
-            with open(file_name, 'w') as f:
+            with open(file_name, 'wb') as f:
                 pickle.dump(prm, f)
+            logger.info('Saved: %s' % file_name)
             return True
         except Exception as exception:
             logger.error(exception)
@@ -441,16 +497,17 @@ class Lda(CheckTools):
 
     def load_params(self, file_name):
         if os.path.exists(file_name):
-            with open(file_name, 'r') as f:
+            with open(file_name, 'rb') as f:
                 prm = pickle.load(f)
             self.set_params(prm)
+            logger.info('Loaded: %s' % file_name)
             return True
         else:
             return False
 
 
 def plotter(s_list, z_list, prms, figtitle, msg):
-    from helpers.plot_models import PlotModels
+    from ml_utils.plot_models import PlotModels
     logger.info('plotting %s %s' % (str(figtitle), msg))
     pi = prms[0]
     phi = arr(prms[1])

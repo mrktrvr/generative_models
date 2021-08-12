@@ -19,19 +19,23 @@ from numpy import einsum
 from numpy.random import choice
 from numpy.random import multivariate_normal as mvnrand
 
-from model_util import CheckTools
-
 cdir = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.append(cdir)
+from model_util import init_expt
+from model_util import CheckTools
 
 sys.path.append(os.path.join(cdir, '..'))
 from distributions.normal_wishart import NormalWishart
 from distributions.dirichlet import Dirichlet
 from distributions.kl_divergence import KL_Norm_Wish
 from distributions.kl_divergence import KL_Dir
-from model_util import init_expt
-from utils.calc_utils import inv
-from utils.calc_utils import logsumexp
-from utils.logger import logger
+from ml_utils.calc_utils import inv
+from ml_utils.calc_utils import logsumexp
+from python_utilities.utils.logger import logger
+
+from matplotlib import pyplot as plt
+from IPython import embed
 
 
 class qMuR():
@@ -44,11 +48,13 @@ class qMuR():
         self.prior = None
         self.post = None
         if do_set_prm:
-            self.set_default_param()
+            self.set_default_params()
 
     def set_default_params(self):
         self.prior = NormalWishart(self.data_dim, self.n_states, True)
-        self.post = NormalWishart(self.data_dim, self.n_states, True)
+        prms = self.prior.get_params()
+        self.post = NormalWishart(self.data_dim, self.n_states, False)
+        self.post.set_params(**prms)
 
     def set_params(self, **args):
         '''
@@ -138,11 +144,23 @@ class qMuR():
     def calc_kl_divergence(self):
         kl_norm_wish = 0
         for k in range(self.n_states):
-            kl_norm_wish += KL_Norm_Wish(
-                self.post.beta[k], self.post.mu[:, k], self.post.nu[k],
-                self.post.W[:, :, k], self.prior.beta[k], self.prior.mu[:, k],
-                self.prior.nu[k], self.prior.W[:, :, k])
+            kl_norm_wish += KL_Norm_Wish(self.post.beta[k], self.post.mu[:, k],
+                                         self.post.nu[k], self.post.W[:, :, k],
+                                         self.prior.beta[k], self.prior.mu[:,
+                                                                           k],
+                                         self.prior.nu[k], self.prior.W[:, :,
+                                                                        k])
         return kl_norm_wish[0]
+
+    def sample_mu(self, data_len=1, by_posterior=True):
+        if by_posterior:
+            R = self.post.expt_prec
+            mu = self.post.sample_mu(data_len, R=R)
+        else:
+            R = self.prior.expt_prec
+            mu = self.prior.sample_mu(data_len, R=R)
+
+        return mu
 
     def samples(self, data_len=1, by_posterior=True):
         '''
@@ -182,7 +200,6 @@ class qPi(object):
     pi.update(s)
     alpha: array(n_states)
     '''
-
     def __init__(self, n_states):
         '''
         pi = qPi(n_states)
@@ -287,7 +304,6 @@ class Theta(object):
     '''
     theta = Theta(data_dim, n_states)
     '''
-
     def __init__(self, data_dim, n_states):
         '''
         theta = Theta(data_dim, n_states)
@@ -339,7 +355,7 @@ class Theta(object):
     def clear_params(self):
         '''
         theta.clear_params()
-        '''
+       '''
         self.qmur.clear_params()
         self.qpi.clear_params()
 
@@ -411,7 +427,7 @@ class Theta(object):
         by_posterior: flag to sample from posterior or prior
         '''
         mu, R = self.qmur.samples(by_posterior=by_posterior)
-        pi = self.pi.samples(by_posterior=by_posterior)
+        pi = self.qpi.samples(by_posterior=by_posterior)
         return mu, R, pi
 
     def expectations(self, by_posterior=True):
@@ -431,7 +447,6 @@ class qS(object):
     qs.expt: n_states x data_len
     qs.const: float
     '''
-
     def __init__(self, n_states, **args):
         '''
         qs = qS(n_states, expt_init_mode='random')
@@ -442,6 +457,7 @@ class qS(object):
         self.n_states = n_states
         self._expt_init_mode = args.get('expt_init_mode', 'random')
         self.expt = None
+        self._ln_lkh = None
         self.const = 0
         self._eps = 1e-10
 
@@ -479,10 +495,24 @@ class qS(object):
         YY: Y Y^T, np.array(data_dim, data_dim, data_len)
         '''
         ln_lkh_gmm = theta.qmur.calc_ln_lkh(Y, YY)
-        ln_lkh = ln_lkh_gmm + theta.qpi.post.expt_ln[:, newaxis]
-        norm = logsumexp(ln_lkh, 0)
-        self.expt = exp(ln_lkh - norm[newaxis, :])
+        self._ln_lkh = ln_lkh_gmm + theta.qpi.post.expt_ln[:, newaxis]
+        norm = logsumexp(self._ln_lkh, 0)
+        self.expt = exp(self._ln_lkh - norm[newaxis, :])
         self.const = norm.sum()
+
+    def predict(self, Y, theta):
+        '''
+        qS.update(Y, theta, YY=None)
+        @argv
+        Y: observation data, np.array(data_dim, data_len)
+        theta: class object, Theta()
+        '''
+        ln_lkh_gmm = theta.qmur.calc_ln_lkh(Y, None)
+        self._ln_lkh = ln_lkh_gmm + theta.qpi.post.expt_ln[:, newaxis]
+        norm = logsumexp(self._ln_lkh, 0)
+        self.expt = exp(self._ln_lkh - norm[newaxis, :])
+        self.const = norm.sum()
+        return self.expt
 
     def samples(self, data_len, pi=None):
         '''
@@ -514,7 +544,6 @@ class Gmm(CheckTools):
     # n_states: number of states
     # expt_s: expectations of hidden states. (n_states x data_len)
     '''
-
     def __init__(self, data_dim, n_states, **args):
         '''
         data_dim: data dim
@@ -526,7 +555,8 @@ class Gmm(CheckTools):
         # --- learning params
         self.update_order = args.get('update_order', ['E', 'M'])
         self._expt_init_mode = args.get('expt_init_mode', 'random')
-        self._vb_th_to_stop_itr = args.get('vb_th_to_stop_itr', 1e-5)
+        self._vb_th_to_stop_itr = args.get('vb_th_to_stop_itr', 1e-7)
+        self._do_early_stop = args.get('do_early_stop', True)
 
         # --- model classes
         self.theta = Theta(data_dim, n_states)
@@ -608,12 +638,25 @@ class Gmm(CheckTools):
                     self.theta.update(Y, self.qs.expt, YY)
                 else:
                     logger.error('%s is not supported' % uo)
+                # self._temp_plot(Y, i, uo)
             is_conversed = self._update_vb(i)
             # --- early stop
             if is_conversed:
                 break
 
         self.expt_s = self.qs.expt
+
+    def _temp_plot(self, Y, i, uo):
+        prm = [
+            self.theta.qmur.post.mu,
+            self.theta.qmur.post.expt_prec,
+            self.theta.qpi.post.expt,
+        ]
+        S = self.qs.expt.argmax(0)
+        title = 'itr %d %s' % (i, uo)
+        vbs = self.vbs[:i + 1] if i == 0 else self.vbs[:i]
+        _plotter_core(Y, S, prm, vbs, 'expextation', title, 100 * 10)
+        plt.pause(1)
 
     def _update_vb(self, i):
         '''
@@ -625,12 +668,15 @@ class Gmm(CheckTools):
                   (self.qs.const, kl_mur, kl_pi, vb, self.vbs[i - 1]))
         logger.debug(logstr)
         if not self.check_vb_increase(self.vbs, i):
-            logger.warning('vb increased')
-        if self.is_conversed(self.vbs, i, self._vb_th_to_stop_itr):
-            self.vbs = self.vbs[:(i + 1)]
-            dst = True
-        else:
             dst = False
+        else:
+            is_conversed = self.is_conversed(self.vbs, i,
+                                             self._vb_th_to_stop_itr)
+            if is_conversed and self._do_early_stop:
+                self.vbs = self.vbs[:(i + 1)]
+                dst = True
+            else:
+                dst = False
         return dst
 
     def calc_vb(self):
@@ -643,6 +689,35 @@ class Gmm(CheckTools):
         kl_pi = self.theta.qpi.calc_kl_divergence()
         vb = self.qs.const - kl_pi - kl_mur
         return vb, kl_pi, kl_mur
+
+    def predict(self, Y=None, use_sample=False):
+        '''
+        return
+        predict_y: (data_dim, data_len), waveform sequence
+        predict_s: (data_len), state sequence which contains 0 to n_states - 1
+        vb: float value, valiational bound
+        '''
+        expt_s = self.qs.predict(Y, self.theta)
+        self.expt_s = expt_s
+        predict_s = expt_s.argmax(0)
+        predict_y = zeros((self.data_dim, len(predict_s)))
+        if use_sample:
+            for k in range(self.n_states):
+                idx = predict_s == k
+                data_len = predict_y[:, idx].shape[-1]
+                mu, R = self.theta.qmur.post.sample()
+                predict_y[:, idx] = mvnrand(mu[:, k],
+                                            inv(R[:, :, k]),
+                                            size=data_len).T
+        else:
+            for k in range(self.n_states):
+                idx = predict_s == k
+                data_len = predict_y[:, idx].shape[-1]
+                m = self.theta.qmur.post.mu[:, k]
+                c = inv(self.theta.qmur.post.expt_prec[:, :, k])
+                predict_y[:, idx] = mvnrand(m, c, size=data_len).T
+        vb = self.calc_vb()
+        return predict_y, predict_s, vb
 
     def samples(self, data_len, **args):
         '''
@@ -669,6 +744,26 @@ class Gmm(CheckTools):
             k = S[t]
             Y[:, t] = mvnrand(mu[:, k], cov[:, :, k])
         return Y, S, [mu, R, pi]
+
+    def get_params(self, by_posterior=True):
+        '''
+        dst = {
+        'MuR': {
+            'mu': (data_dim, n_states),
+            'beta': (n_states),
+            'nu': (n_states),
+            'W': (data_dim, data_dim, n_states),
+            },
+        'Pi': {
+            'alpha': (n_states),
+            'ln_alpha': (n_states),
+            },
+        'n_states': int,
+        'data_dim': int,
+        }
+        '''
+        dst = self.theta.get_params(by_posterior)
+        return dst
 
     def save_params(self, file_name):
         was_saved = self.theta.save_params(file_name)
@@ -700,7 +795,7 @@ def plotter(y, s, gmm, title, figno=1):
 
 
 def _plotter_core(y, s, prms, vbs, prm_type_str, sup_title, figno):
-    from helpers.plot_models import PlotModels
+    from ml_utils.plot_models import PlotModels
     mu, r, pi = prms
     n_cols = 3
     pm = PlotModels(3, n_cols, figno)
@@ -725,8 +820,14 @@ def _plotter_core(y, s, prms, vbs, prm_type_str, sup_title, figno):
 
 
 def gen_data(data_dim, n_states, data_len):
-    from helpers.calc_util import rand_wishart
+    from ml_utils.calc_utils import rand_wishart
     from numpy.random import seed
+    from numpy import arange
+    from numpy import tile
+    from numpy import eye
+    from numpy import nonzero
+    from numpy import concatenate
+    from numpy import array as arr
     seed(1)
     gmm = Gmm(data_dim, n_states, expt_init_mode='random')
     gmm.set_default_params()
@@ -735,11 +836,25 @@ def gen_data(data_dim, n_states, data_len):
         mu = randn(data_dim, n_states) * 2
     else:
         from numpy import linspace
-        mu = linspace(-1, 1, data_dim * n_states) * 2
+        mu = linspace(-1, 1, data_dim * n_states)
+        # mu = exp(linspace(-1, 1, data_dim * n_states) * 10)
         mu = mu.reshape(n_states, data_dim).T
-    W = rand_wishart(data_dim, n_states, c=1e+3, by_eye=True)
-    gmm.set_params({'MuR': {'mu': mu, 'W': W}})
+        # W = rand_wishart(data_dim, n_states, c=1e+3, by_eye=True)
+        # W = tile(eye(data_dim) * 10, (n_states, 1, 1))
+        w_diag = arange(n_states * data_dim).reshape(n_states, data_dim) + 1
+        w_diag = w_diag[:, -1] * 1e+2
+        W = arr([eye(data_dim) * w_diag[k] for k in range(n_states)])
+        W = W.transpose(1, 2, 0)
+    prms = {
+        'MuR': {
+            'mu': mu,
+            'W': W,
+        }
+    }
+    gmm.set_params(prms)
     y, s, _ = gmm.samples(data_len)
+    idx = concatenate([nonzero(s == k)[0] for k in range(n_states)])
+    y = y[:, idx]
     # --- plotter
     plotter(y, s, gmm, 'GMM data', 1)
     return y
@@ -747,43 +862,71 @@ def gen_data(data_dim, n_states, data_len):
 
 def update(y, n_states):
     from numpy.random import randn
+    from numpy import arange
+    from numpy import eye
+    from numpy import array as arr
+    from numpy import cov
+    from numpy.random import multivariate_normal as mvn_rand
+    from sklearn.cluster import KMeans
+
     data_dim, data_len = y.shape
+
     # --- setting
-    uo = ['M', 'E']
-    # gmm = Gmm(data_dim, n_states, expt_init_mode='random')
-    # gmm = Gmm(data_dim, n_states, expt_init_mode='random', update_order=uo)
-    gmm = Gmm(data_dim, n_states, expt_init_mode='kmeans', update_order=uo)
+    gmm_setting = {
+        # 'update_order': ['M', 'E'],
+        'update_order': ['E', 'M'],
+        # 'expt_init_mode': 'random',
+        'expt_init_mode': 'kmeans',
+    }
+    gmm = Gmm(data_dim, n_states, **gmm_setting)
+
     # --- Mu
-    # mu = randn(data_dim, n_states) * 2
-    # mu = zeros((data_dim, n_states))
-    mu = randn(data_dim, n_states)
+    mu_mode = 'mvn_rand'
+    if mu_mode == 'zeros':
+        mu = zeros((data_dim, n_states))
+    elif mu_mode == 'randn':
+        c = 2
+        mu = randn(data_dim, n_states) * c
+    elif mu_mode == 'arange':
+        mu = arange(data_dim * n_states).reshape(data_dim, n_states)
+    elif mu_mode == 'kmeans':
+        km = KMeans(n_states)
+        km.fit(y.T)
+        mu = km.cluster_centers_.T
+    elif mu_mode == 'mvn_rand':
+        mu = mvn_rand(y.mean(1), cov(y), size=n_states).T
+    else:
+        raise Exception('Not supported: %s' % mu_mode)
+
+    alpha = ones(n_states) * (data_len / n_states)
+    W = arr([eye(data_dim) * 1e+3 for k in range(n_states)])
+    W = W.transpose(1, 2, 0)
     # --- set params
-    gmm.set_params({'MuR': {'mu': mu}})
+    prms = {'MuR': {'mu': mu, 'W': W}, 'Pi': {'alpha': alpha}}
+    gmm.set_params(prms)
     gmm.init_expt_s(data_len, y)
     # --- plotter
     s = gmm.expt_s.argmax(0)
     plotter(y, s, gmm, 'GMM prior', 2)
     # --- update
-    gmm.update(y, 100)
+    gmm.update(y, 200)
     # --- plotter
     s = gmm.expt_s.argmax(0)
     plotter(y, s, gmm, 'posterior', 3)
+
+    predict_y, predict_s, vb = gmm.predict(y)
 
 
 def main():
     from matplotlib import pyplot as plt
     data_dim = 2
-    n_states = 4
-    data_len = 2000
+    n_states = 3
+    data_len = 100
     y = gen_data(data_dim, n_states, data_len)
     update(y, n_states)
-<<<<<<< HEAD
-    plt.pause(1)
-=======
     plt.ion()
     plt.show()
     input('return to finish')
->>>>>>> a5965fdefd868b26a1c7967a9f8faa90e0c4c4be
 
 
 if __name__ == '__main__':
