@@ -24,7 +24,42 @@ from utils.calc_utils import logsumexp
 from utils.logger import logger
 
 
-class Gamma:
+class Gamma():
+
+    def __init__(self, a, b):
+        self.a_prior = a
+        self.b_prior = b
+        self.a_post = np.copy(self.a_prior)
+        self.b_post = np.copy(self.b_prior)
+
+    def update_posterior(self, data):
+        '''
+        '''
+        self.a_post = self.a_prior + sum(data)
+        self.b_post = self.b_prior + len(data)
+
+    def expectation(self):
+        expt = self.a_post / self.b_post
+        return expt
+
+    def sample(self, size=1):
+        a = self.a_post
+        scale = 1 / self.b_post
+        # dst = stats.gamma(a=a, scale=scale)
+        dst = np.random.gamma(a, scale=scale, size=size)
+        return dst
+
+    def hyper_parameters(self):
+        dst = {
+            'a_prior': self.a_prior,
+            'b_prior': self.b_prior,
+            'a_posterior': self.a_post,
+            'b_posterior': self.b_post,
+        }
+        return dst
+
+
+class Gamma2():
     '''
     gd = Gamma(n_states)
     '''

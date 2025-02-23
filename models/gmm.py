@@ -30,15 +30,16 @@ from distributions.normal_wishart import NormalWishart
 from distributions.dirichlet import Dirichlet
 from distributions.kl_divergence import KL_Norm_Wish
 from distributions.kl_divergence import KL_Dir
-from ml_utils.calc_utils import inv
-from ml_utils.calc_utils import logsumexp
-from python_utilities.utils.logger import logger
+from utils.calc_utils import inv
+from utils.calc_utils import logsumexp
+from utils.logger import logger
 
 from matplotlib import pyplot as plt
 from IPython import embed
 
 
 class qMuR():
+
     def __init__(self, data_dim, n_states, do_set_prm=False):
         '''
         mur = qMuR(data_dim, n_states)
@@ -200,6 +201,7 @@ class qPi(object):
     pi.update(s)
     alpha: array(n_states)
     '''
+
     def __init__(self, n_states):
         '''
         pi = qPi(n_states)
@@ -304,6 +306,7 @@ class Theta(object):
     '''
     theta = Theta(data_dim, n_states)
     '''
+
     def __init__(self, data_dim, n_states):
         '''
         theta = Theta(data_dim, n_states)
@@ -447,6 +450,7 @@ class qS(object):
     qs.expt: n_states x data_len
     qs.const: float
     '''
+
     def __init__(self, n_states, **args):
         '''
         qs = qS(n_states, expt_init_mode='random')
@@ -544,6 +548,7 @@ class Gmm(CheckTools):
     # n_states: number of states
     # expt_s: expectations of hidden states. (n_states x data_len)
     '''
+
     def __init__(self, data_dim, n_states, **args):
         '''
         data_dim: data dim

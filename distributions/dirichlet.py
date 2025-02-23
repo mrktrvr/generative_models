@@ -6,6 +6,7 @@ dirichlet.py
 import os
 import sys
 
+import numpy as np
 from numpy import log
 from numpy import exp
 from numpy import zeros
@@ -22,7 +23,53 @@ from utils.calc_utils import logsumexp
 from utils.logger import logger
 
 
-class Dirichlet(object):
+class Dirichlet():
+
+    def __init__(self, alpha):
+        '''
+        '''
+        self.alpha_prior = alpha
+        self.alpha_post = alpha
+        self.ndim = self.alpha_post.ndim
+        if self.ndim == 1:
+            self.n_states = self.alpha_post.shape[0]
+            self.n_states_2d = 0
+        elif self.ndim == 2:
+            self.n_states = self.alpha_post.shape[0]
+            self.n_states_2d = self.alpha_post.shape[1]
+        else:
+            raise NotImplementedError('%d dim Not supported' % self.ndim)
+
+    def expectation(self):
+        if self.alpha_post is None:
+            return None
+        dst = self.alpha_post / sum(self.alpha_post)
+        return dst
+
+    def log_expectation(self):
+        if self.alpha_post is None:
+            return None
+        if self.ndim == 1:
+            tmp1 = digamma(self.alpha_post)
+            tmp2 = digamma(self.alpha_post.sum())
+            expt_ln = tmp1 - tmp2[np.newaxis]
+        elif self.ndim == 2:
+            tmp1 = digamma(self.alpha_post)
+            tmp2 = digamma(self.alpha_post.sum(0))
+            expt_ln = tmp1 - tmp2[np.newaxis, :]
+        else:
+            raise NotImplementedError('%d dim Not supported' % self.ndim)
+        return expt_ln
+
+    def hyper_parameters(self):
+        dst = {
+            'alpha_prior': self.alpha_prior,
+            'alpha_posterior': self.alpha_post,
+        }
+        return dst
+
+
+class Dirichlet2(object):
     '''
     Dirichlet()
     '''
@@ -173,14 +220,13 @@ class Dirichlet(object):
             colw = ones(n_states) / float(n_states)
         else:
             logger.error('ndim %d not supported' % ndim)
-        plt.table(
-            cellText=cell,
-            rowLabels=rows,
-            colLabels=cols,
-            colWidths=colw,
-            loc='center',
-            cellLoc='center',
-            colLoc='center')
+        plt.table(cellText=cell,
+                  rowLabels=rows,
+                  colLabels=cols,
+                  colWidths=colw,
+                  loc='center',
+                  cellLoc='center',
+                  colLoc='center')
         plt.axis('off')
 
 
