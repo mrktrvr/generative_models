@@ -1,5 +1,10 @@
+import os
+import sys
 import numpy as np
-from gamma import Gamma
+
+CDIR = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(CDIR, '..'))
+from distributions.gamma import Gamma
 
 
 class Poisson():

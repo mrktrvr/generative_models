@@ -6,12 +6,7 @@ normal_wishart.py
 import os
 import sys
 
-from numpy import newaxis
-from numpy import log
-from numpy import zeros
-from numpy import arange
-from numpy import tile
-from numpy import einsum
+import numpy as np
 from numpy.random import multivariate_normal as mvnrnd
 from scipy.special import digamma
 from scipy.stats import wishart
@@ -23,6 +18,113 @@ sys.path.append(os.path.join(cdir, '..'))
 from utils.calc_utils import inv
 from utils.calc_utils import logdet
 from utils.logger import logger
+
+
+class Wishart():
+
+    def __init__(self, nu, w):
+        '''
+        '''
+        self.data_dim, _, self.n_states = w.shape
+        self.nu_prior = nu
+        self.nu_post = nu
+        self.w_prior = w
+        self.w_post = w
+        self.inv_w_prior = self._inv(w)
+        self.inv_w_post = self.inv_w_prior
+
+    def _inv(self, src):
+        dst = inv(src.transpose(2, 0, 1)).transpose(1, 2, 0)
+        return dst
+
+    def expectation_prec(self):
+        r'''
+        dst: data_dim x data_dim x n_states
+        <R> = \hat{\nu} \hat{W}
+        '''
+        dst = np.einsum('k,dek->dek', self.nu_post, self.w_post)
+        return dst
+
+    def expectation_cov(self):
+        prec = self.expectation_prec()
+        cov = self._inv(prec)
+        return cov
+
+    def sample_R(self, data_len=1):
+        '''
+        R: (data_len, data_dim, data_dim, n_states)
+        '''
+        R = np.zeros((data_len, self.data_dim, self.data_dim, self.n_states))
+        for k in range(self.n_states):
+            nu = self.nu_post[k]
+            w = self.w_post[:, :, k]
+            try:
+                R[:, :, :, k] = wishart.rvs(nu, w, size=data_len)
+            except Exception as e:
+                R[:, :, :, k] = np.tile((nu * w), (data_len, 1, 1))
+                logger.warning(' '.join([
+                    'whshart.rvs failed.',
+                    'use expectations instead.',
+                    '(%s)' % e,
+                ]))
+        return R
+
+
+class NormWish(Wishart):
+
+    def __init__(self, mu, beta=None, nu=None, wish=None):
+        '''
+        mu: mean, np.array(data_dim, n_states=1)
+        beta: float, np.array(n_states=1), default None
+        nu: float, np.array(n_states=1), default None
+        wish: np.array(data_dim, data_dim, n_states=1), default None
+        '''
+        self.data_dim = mu.shape[0]
+        self.n_states = mu.shape[1]
+        nw_prms = NormalWishartParams(self.data_dim, self.n_states)
+        beta = nw_prms.beta if beta is None else beta
+        nu = nw_prms.nu if nu is None else nu
+        wish = nw_prms.W if wish is None else wish
+        Wishart.__init__(self, nu, wish)
+        self.mu_prior = mu
+        self.mu_post = np.copy(self.mu_prior)
+        self.beta_prior = beta
+        self.beta_post = beta
+
+    def update_posterior(self, data):
+        '''
+        data: np.array(data_dim, data_len)
+        '''
+        data_dim, data_len = data.shape
+        mu_prior = self.mu_prior
+        beta_prior = self.beta_prior
+        nu_prior = self.nu_prior
+        inv_w_prior = self.inv_w_prior
+        sum_y = np.sum(data, axis=1, keepdims=True)
+        # --- mu
+        mu_h = (sum_y + beta_prior * mu_prior) / (data_len + beta_prior)
+        # --- beta
+        beta_h = data_len + beta_prior
+        # --- nu
+        nu_h = data_len + nu_prior
+        # --- inverse W
+        sum_yy = np.einsum('dt,et->de', data, data)
+        bmm_prior = np.einsum('k,dk,ke->dek', beta_prior, mu_prior, mu_prior)
+        bmm_post = np.einsum('k,dk,ke->dek', beta_h, mu_h, mu_h)
+        inv_w_h = sum_yy + bmm_prior - bmm_post + inv_w_prior
+        # ---
+        self.mu_post = mu_h
+        self.beta_post = beta_h
+        self.nu_post = nu_h
+        self.inv_w_post = inv_w_h
+        self.w_post = self._inv(inv_w_h)
+
+    def sample(self, data_len):
+        cov = self.expectation_cov()
+        mu = self.mu_post
+        dst = np.zeros((self.data_dim, data_len))
+        for k in range(self.n_states):
+            mvnrnd(mu[:, k], cov[:, :, k], size=data_len)
 
 
 class NormalWishart(object):
@@ -185,7 +287,7 @@ class NormalWishart(object):
         '''
         if R is None:
             R = self.sample_R()[0]
-        mu = zeros((data_len, self.data_dim, self.n_states))
+        mu = np.zeros((data_len, self.data_dim, self.n_states))
         for k in range(self.n_states):
             # cov = inv(self.beta[k] * R[:, :, k])
             cov = inv(R[:, :, k])
@@ -193,26 +295,27 @@ class NormalWishart(object):
                 mu[:, :, k] = mvnrnd(self.mu[:, k], cov, size=data_len)
             except RuntimeWarning as e:
                 logger.warn('%s %d. not sampled' % (e, mu.shape[0]))
-                mu[:, :, k] = self.mu[newaxis, :, k]
+                mu[:, :, k] = self.mu[np.newaxis, :, k]
             except Exception as e:
                 logger.error('%s %d. not sampled.' % (e, mu.shape[0]))
-                mu[:, :, k] = self.mu[newaxis, :, k]
+                mu[:, :, k] = self.mu[np.newaxis, :, k]
         return mu
 
     def sample_R(self, data_len=1):
         '''
         R: (data_len, data_dim, data_dim, n_states)
         '''
-        R = zeros((data_len, self.data_dim, self.data_dim, self.n_states))
+        R = np.zeros((data_len, self.data_dim, self.data_dim, self.n_states))
         for k in range(self.n_states):
             nu = self.nu[k]
             W = self.W[:, :, k]
             try:
                 R[:, :, :, k] = wishart.rvs(nu, W, size=data_len)
             except Exception as exception:
-                R[:, :, :, k] = tile((nu * W), (data_len, 1, 1))
-                logger.warn('whshart.rvs failed set expectations instead. (%s)'
-                            % exception)
+                R[:, :, :, k] = np.tile((nu * W), (data_len, 1, 1))
+                logger.warn(
+                    'whshart.rvs failed set expectations instead. (%s)' %
+                    exception)
         return R
 
     def sample_mu_R(self, data_len=1):
@@ -230,54 +333,54 @@ class NormalWishart(object):
     def calc_lkh(self, Y, YY=None):
         from numpy import pi as np_pi
         data_dim, data_len = Y.shape
-        ln_lkh = zeros((self.n_states, data_len))
-        ln_lkh -= 0.5 * data_dim * log(2 * np_pi)
-        ln_lkh += 0.5 * self.expt_lndet_prec[:, newaxis]
+        ln_lkh = np.zeros((self.n_states, data_len))
+        ln_lkh -= 0.5 * data_dim * np.log(2 * np_pi)
+        ln_lkh += 0.5 * self.expt_lndet_prec[:, np.newaxis]
         if YY is None:
-            YY = einsum('dt,et->det', Y, Y)
-        ln_lkh -= 0.5 * einsum('dek,det->kt', self.expt_prec, YY)
-        ln_lkh += einsum('dt,dk->kt', Y, self.expt_prec_mu)
-        ln_lkh -= 0.5 * self.expt_mu_prec_mu[:, newaxis]
+            YY = np.einsum('dt,et->det', Y, Y)
+        ln_lkh -= 0.5 * np.einsum('dek,det->kt', self.expt_prec, YY)
+        ln_lkh += np.einsum('dt,dk->kt', Y, self.expt_prec_mu)
+        ln_lkh -= 0.5 * self.expt_mu_prec_mu[:, np.newaxis]
         return ln_lkh
 
     def calc_expt_prec(self):
-        '''
+        r'''
         dst: data_dim x data_dim x n_states
         <R> = \hat{\nu} \hat{W}
         '''
-        dst = einsum('k,dek->dek', self.nu, self.W)
+        dst = np.einsum('k,dek->dek', self.nu, self.W)
         return dst
 
     def calc_expt_lndet_prec(self):
-        '''
+        r'''
         dst: n_states
         <ln|R|> = \sum \phi(\frac{\hat(\nu + 1 - d)}{2})
                   + D * log(2)
                   + \ln(||hat(W)|)
         '''
-        nu_d = self.nu[:, newaxis] - arange(self.data_dim)[newaxis, :]
+        nu_d = self.nu[:, np.newaxis] - np.arange(self.data_dim)[np.newaxis, :]
         term1 = digamma((nu_d + 1.0) / 2.0).sum(1)
-        term2 = self.data_dim * log(2)
+        term2 = self.data_dim * np.log(2)
         term3 = logdet(self.W.transpose(2, 0, 1))
         dst = term1 + term2 + term3
         return dst
 
     def calc_expt_prec_mu(self):
-        '''
+        r'''
         dst: data_dim x n_states
         <R\mu> = \hat{\nu} \hat{W} \hat{m}
         '''
-        dst = einsum('k,dek,ek->dk', self.nu, self.W, self.mu)
+        dst = np.einsum('k,dek,ek->dk', self.nu, self.W, self.mu)
         return dst
 
     def calc_expt_mu_prec_mu(self):
-        '''
+        r'''
         dst: n_states
         <\mu R \mu> = \hat{\nu} \hat{\mu} \hat{W} \hat{\mu}
                       + frac{D}{\hat{\beta}}
                     = \hat{m}^T <R\mu>.
         '''
-        tmp1 = einsum('k,dk,dek,ek->k', self.nu, self.mu, self.W, self.mu)
+        tmp1 = np.einsum('k,dk,dek,ek->k', self.nu, self.mu, self.W, self.mu)
         tmp2 = self.data_dim / self.beta
         dst = tmp1 + tmp2
         return dst

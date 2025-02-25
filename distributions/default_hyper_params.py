@@ -6,9 +6,7 @@ default_hyper_params.py
 import os
 import sys
 
-from numpy import eye
-from numpy import ones
-from numpy import tile
+import numpy as np
 from numpy.random import randn
 
 cdir = os.path.abspath(os.path.dirname(__file__))
@@ -17,6 +15,7 @@ sys.path.append(lib_root)
 
 
 class MultivariateNormalParams(object):
+
     def __init__(self, data_dim, n_states=1, **kargs):
         '''
         @argvs
@@ -42,11 +41,34 @@ class MultivariateNormalParams(object):
     def _gen_cov(self):
         # c = 1e+2
         c = 1e+0
-        e = eye(self.data_dim)
-        self.cov = tile(e, (self.n_states, 1, 1)).transpose(1, 2, 0) * c
+        e = np.eye(self.data_dim)
+        self.cov = np.tile(e, (self.n_states, 1, 1)).transpose(1, 2, 0) * c
 
 
-class NormalWishartParams(object):
+class WishartParams():
+
+    def __init__(self, data_dim, n_states):
+        self.data_dim = data_dim
+        self.n_states = n_states
+        self.nu = None
+        self.W = None
+        self._gen_nu()
+        self._gen_W()
+
+    def _gen_W(self, c=1e-1, by_eye=True):
+        if False:
+            from utils.calc_utils import rand_wishart
+            self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
+        else:
+            tmp = np.tile(np.eye(self.data_dim), (self.n_states, 1, 1))
+            self.W = tmp.transpose(1, 2, 0)
+
+    def _gen_nu(self):
+        self.nu = np.ones((self.n_states)) * self.data_dim
+
+
+class NormalWishartParams(WishartParams):
+
     def __init__(self, data_dim, n_states):
         '''
         @argvs
@@ -63,12 +85,9 @@ class NormalWishartParams(object):
         self.n_states = n_states
         self.mu = None
         self.beta = None
-        self.nu = None
-        self.W = None
         self._gen_mu()
         self._gen_beta()
-        self._gen_nu()
-        self._gen_W()
+        WishartParams.__init__(self, data_dim, n_states)
 
     def _gen_mu(self):
         # self.mu = zeros((self.data_dim, self.n_states))
@@ -76,21 +95,11 @@ class NormalWishartParams(object):
         self.mu = 1.0 * (randn(self.data_dim, self.n_states) - 0.5)
 
     def _gen_beta(self):
-        self.beta = ones(self.n_states)
-
-    def _gen_W(self, c=1e-1, by_eye=True):
-        if False:
-            from utils.calc_utils import rand_wishart
-            self.W = rand_wishart(self.data_dim, self.n_states, c, by_eye)
-        else:
-            tmp = tile(eye(self.data_dim), (self.n_states, 1, 1))
-            self.W = tmp.transpose(1, 2, 0)
-
-    def _gen_nu(self):
-        self.nu = ones((self.n_states)) * self.data_dim
+        self.beta = np.ones(self.n_states)
 
 
 class ParamDirichlet(object):
+
     def __init__(self, n_states, len_2d=-1):
         self.n_states = n_states
         self.len_2d = len_2d
@@ -99,12 +108,13 @@ class ParamDirichlet(object):
 
     def _gen_alpha(self, c=2e+0):
         if self.len_2d == -1:
-            self.alpha = ones(self.n_states) * c
+            self.alpha = np.ones(self.n_states) * c
         else:
-            self.alpha = ones((self.n_states, self.len_2d)) * c
+            self.alpha = np.ones((self.n_states, self.len_2d)) * c
 
 
 class ParamGamma(object):
+
     def __init__(self, data_dim, n_states):
         self.data_dim = data_dim
         self.n_states = n_states
@@ -112,8 +122,8 @@ class ParamGamma(object):
         self.b = None
 
     def _gen_gam(self, c=1e+0):
-        a = ones((self.data_dim, self.n_states)) * c
-        b = ones((self.data_dim, self.n_states)) * c
+        a = np.ones((self.data_dim, self.n_states)) * c
+        b = np.ones((self.data_dim, self.n_states)) * c
         return a, b
 
 

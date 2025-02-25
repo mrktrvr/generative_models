@@ -5,11 +5,7 @@ gamma.py
 '''
 import os
 import sys
-from numpy import log
-from numpy import ones
-from numpy import eye
-from numpy import diag
-from numpy import einsum
+import numpy as np
 from numpy.random import gamma as gamrand
 from scipy.special import digamma
 

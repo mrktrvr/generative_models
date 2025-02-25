@@ -6,6 +6,7 @@ multivariate_normal.py
 
 import os
 import sys
+import numpy as np
 from numpy import newaxis
 from numpy import einsum
 from numpy import log
@@ -156,29 +157,31 @@ class MultivariateNormal(object):
             dst = zeros((data_len, self.mu.shape[0], self.mu.shape[1]))
             if self.cov.ndim == 2:
                 for k in range(self.mu.shape[-1]):
-                    dst[:, :, k] = mvnrnd(
-                        self.mu[:, k], self.cov, size=data_len)
+                    dst[:, :, k] = mvnrnd(self.mu[:, k],
+                                          self.cov,
+                                          size=data_len)
             elif self.cov.ndim == 3:
                 for k in range(self.mu.shape[-1]):
-                    dst[:, :, k] = mvnrnd(
-                        self.mu[:, k], self.cov[:, :, k], size=data_len)
+                    dst[:, :, k] = mvnrnd(self.mu[:, k],
+                                          self.cov[:, :, k],
+                                          size=data_len)
             else:
                 self._log_error_not_supported()
         elif self.mu.ndim == 3:
             if self.cov.ndim == 3:
                 for d in range(self.mu.shape[-2]):
                     for k in range(self.mu.shape[-1]):
-                        dst[:, d, k] = mvnrnd(
-                            self.mu[d, k], self.cov[:, :, k], size=data_len)
+                        dst[:, d, k] = mvnrnd(self.mu[d, k],
+                                              self.cov[:, :, k],
+                                              size=data_len)
             elif self.cov.ndim == 4:
                 aug_dim, data_dim, n_states = self.mu.shape
                 dst = zeros((data_len, aug_dim, data_dim, n_states))
                 for d in range(data_dim):
                     for k in range(n_states):
-                        dst[:, :, d, k] = mvnrnd(
-                            self.mu[:, d, k],
-                            self.cov[:, :, d, k],
-                            size=data_len)
+                        dst[:, :, d, k] = mvnrnd(self.mu[:, d, k],
+                                                 self.cov[:, :, d, k],
+                                                 size=data_len)
             else:
                 self.__log_error_not_supported()
         elif self.mu.ndim == 1:
@@ -337,9 +340,8 @@ if __name__ == '__main__':
         ]),
         '--- cov (diag)',
         '\n'.join([
-            'k=%2d:%s' %
-            (k,
-             ','.join(['%6.2f' % mvn._cov[d, d, k] for d in range(data_dim)]))
+            'k=%2d:%s' % (k, ','.join(
+                ['%6.2f' % mvn._cov[d, d, k] for d in range(data_dim)]))
             for k in range(n_states)
         ]),
         '--- samples',
