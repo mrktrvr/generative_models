@@ -23,34 +23,34 @@ from utils.logger import logger
 class Gamma():
 
     def __init__(self, a, b):
-        self.a_prior = a
-        self.b_prior = b
-        self.a_post = np.copy(self.a_prior)
-        self.b_post = np.copy(self.b_prior)
+        self.alpha_prior = a
+        self.beta_prior = b
+        self.alpha = np.copy(self.alpha_prior)
+        self.beta = np.copy(self.beta_prior)
 
     def update_posterior(self, data):
         '''
         '''
-        self.a_post = self.a_prior + sum(data)
-        self.b_post = self.b_prior + len(data)
+        self.alpha = self.alpha_prior + sum(data)
+        self.beta = self.beta_prior + len(data)
 
     def expectation(self):
-        expt = self.a_post / self.b_post
+        expt = self.alpha / self.beta
         return expt
 
     def sample(self, size=1):
-        a = self.a_post
-        scale = 1 / self.b_post
+        a = self.alpha
+        scale = 1 / self.beta
         # dst = stats.gamma(a=a, scale=scale)
         dst = np.random.gamma(a, scale=scale, size=size)
         return dst
 
     def hyper_parameters(self):
         dst = {
-            'a_prior': self.a_prior,
-            'b_prior': self.b_prior,
-            'a_posterior': self.a_post,
-            'b_posterior': self.b_post,
+            'alpha_prior': self.alpha_prior,
+            'beta_prior': self.beta_prior,
+            'alpha_posterior': self.alpha,
+            'beta_posterior': self.beta,
         }
         return dst
 

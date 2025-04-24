@@ -28,9 +28,9 @@ class BetaDistribution:
             raise ValueError('x must be in the range [0, 1].')
         return stats.beta.cdf(x, self.alpha, self.beta)
 
-    def mean(self) -> float:
+    def expectation(self) -> float:
         '''
-        Return the mean of the Beta distribution.
+        Return the expectation of the Beta distribution.
         '''
         return self.alpha / (self.alpha + self.beta)
 
@@ -67,14 +67,14 @@ class BetaDistribution:
 
 def main():
     beta = BetaDistribution(10, 10)
-    print('%2d: %.3f' % (-1, beta.mean()))
+    print('%2d: %.3f' % (-1, beta.expectation()))
     np.random.seed(20)
     for i in range(20):
         p = np.random.rand(100)
         success = sum(p >= 0.5)
         failure = sum(p < 0.5)
         beta.update(success, failure)
-        print('%2d: %.3f' % (i, beta.mean()), success, failure)
+        print('%2d: %.3f' % (i, beta.expectation()), success, failure)
 
 
 if __name__ == '__main__':
